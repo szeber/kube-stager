@@ -1,0 +1,15 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- config_v1_mongoconfig.yaml
+- config_v1_mysqlconfig.yaml
+- config_v1_redisconfig.yaml
+- config_v1_serviceconfig.yaml
+- task_v1_mongodatabase.yaml
+- task_v1_mysqldatabase.yaml
+- task_v1_redisdatabase.yaml
+- site_v1_stagingsite.yaml
+- job_v1_backup.yaml
+- job_v1_dbinitjob.yaml
+- job_v1_dbmigrationjob.yaml
+- controller-config_v1_projectconfig.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

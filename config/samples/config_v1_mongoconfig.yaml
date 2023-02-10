@@ -1,0 +1,12 @@
+apiVersion: config.operator.kube-stager.io/v1
+kind: MongoConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: mongoconfig
+    app.kubernetes.io/instance: mongoconfig-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: mongoconfig-sample
+spec:
+  # TODO(user): Add fields here

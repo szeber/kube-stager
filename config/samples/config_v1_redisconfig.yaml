@@ -1,0 +1,12 @@
+apiVersion: config.operator.kube-stager.io/v1
+kind: RedisConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: redisconfig
+    app.kubernetes.io/instance: redisconfig-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: redisconfig-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,27 @@
+# permissions for end users to view redisdatabases.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: redisdatabase-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: kube-stager
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+  name: redisdatabase-viewer-role
+rules:
+- apiGroups:
+  - task.operator.kube-stager.io
+  resources:
+  - redisdatabases
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - task.operator.kube-stager.io
+  resources:
+  - redisdatabases/status
+  verbs:
+  - get

@@ -1,0 +1,27 @@
+# permissions for end users to view stagingsites.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: stagingsite-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: kube-stager
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+  name: stagingsite-viewer-role
+rules:
+- apiGroups:
+  - site.operator.kube-stager.io
+  resources:
+  - stagingsites
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - site.operator.kube-stager.io
+  resources:
+  - stagingsites/status
+  verbs:
+  - get

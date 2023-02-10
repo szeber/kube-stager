@@ -1,0 +1,12 @@
+apiVersion: task.operator.kube-stager.io/v1
+kind: MysqlDatabase
+metadata:
+  labels:
+    app.kubernetes.io/name: mysqldatabase
+    app.kubernetes.io/instance: mysqldatabase-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: mysqldatabase-sample
+spec:
+  # TODO(user): Add fields here

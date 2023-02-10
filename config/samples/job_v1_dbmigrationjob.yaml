@@ -1,0 +1,12 @@
+apiVersion: job.operator.kube-stager.io/v1
+kind: DbMigrationJob
+metadata:
+  labels:
+    app.kubernetes.io/name: dbmigrationjob
+    app.kubernetes.io/instance: dbmigrationjob-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: dbmigrationjob-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,31 @@
+# permissions for end users to edit mongoconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: mongoconfig-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: kube-stager
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+  name: mongoconfig-editor-role
+rules:
+- apiGroups:
+  - config.operator.kube-stager.io
+  resources:
+  - mongoconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.operator.kube-stager.io
+  resources:
+  - mongoconfigs/status
+  verbs:
+  - get

@@ -1,0 +1,118 @@
+domain: operator.kube-stager.io
+layout:
+- go.kubebuilder.io/v4-alpha
+multigroup: true
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: kube-stager
+repo: github.com/szeber/kube-stager
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: config
+  kind: MongoConfig
+  path: github.com/szeber/kube-stager/apis/config/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: operator.kube-stager.io
+  group: config
+  kind: MysqlConfig
+  path: github.com/szeber/kube-stager/apis/config/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: operator.kube-stager.io
+  group: config
+  kind: RedisConfig
+  path: github.com/szeber/kube-stager/apis/config/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: operator.kube-stager.io
+  group: config
+  kind: ServiceConfig
+  path: github.com/szeber/kube-stager/apis/config/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: task
+  kind: MongoDatabase
+  path: github.com/szeber/kube-stager/apis/task/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: task
+  kind: MysqlDatabase
+  path: github.com/szeber/kube-stager/apis/task/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: task
+  kind: RedisDatabase
+  path: github.com/szeber/kube-stager/apis/task/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: site
+  kind: StagingSite
+  path: github.com/szeber/kube-stager/apis/site/v1
+  version: v1
+  webhooks:
+    defaulting: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: job
+  kind: Backup
+  path: github.com/szeber/kube-stager/apis/job/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: job
+  kind: DbInitJob
+  path: github.com/szeber/kube-stager/apis/job/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: operator.kube-stager.io
+  group: job
+  kind: DbMigrationJob
+  path: github.com/szeber/kube-stager/apis/job/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: operator.kube-stager.io
+  group: controller-config
+  kind: ProjectConfig
+  path: github.com/szeber/kube-stager/apis/controller-config/v1
+  version: v1
+version: "3"

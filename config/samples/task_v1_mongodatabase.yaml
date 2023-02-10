@@ -1,0 +1,12 @@
+apiVersion: task.operator.kube-stager.io/v1
+kind: MongoDatabase
+metadata:
+  labels:
+    app.kubernetes.io/name: mongodatabase
+    app.kubernetes.io/instance: mongodatabase-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: mongodatabase-sample
+spec:
+  # TODO(user): Add fields here

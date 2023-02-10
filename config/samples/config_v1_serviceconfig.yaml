@@ -1,0 +1,12 @@
+apiVersion: config.operator.kube-stager.io/v1
+kind: ServiceConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: serviceconfig
+    app.kubernetes.io/instance: serviceconfig-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: serviceconfig-sample
+spec:
+  # TODO(user): Add fields here

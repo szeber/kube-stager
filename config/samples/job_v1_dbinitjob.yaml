@@ -1,0 +1,12 @@
+apiVersion: job.operator.kube-stager.io/v1
+kind: DbInitJob
+metadata:
+  labels:
+    app.kubernetes.io/name: dbinitjob
+    app.kubernetes.io/instance: dbinitjob-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: dbinitjob-sample
+spec:
+  # TODO(user): Add fields here

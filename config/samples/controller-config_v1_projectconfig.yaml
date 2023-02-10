@@ -1,0 +1,12 @@
+apiVersion: controller-config.operator.kube-stager.io/v1
+kind: ProjectConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: projectconfig
+    app.kubernetes.io/instance: projectconfig-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: projectconfig-sample
+spec:
+  # TODO(user): Add fields here

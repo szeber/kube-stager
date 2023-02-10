@@ -1,0 +1,118 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: dbinitjobs.job.operator.kube-stager.io
+spec:
+  group: job.operator.kube-stager.io
+  names:
+    kind: DbInitJob
+    listKind: DbInitJobList
+    plural: dbinitjobs
+    singular: dbinitjob
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteName
+      name: Site
+      type: string
+    - jsonPath: .spec.serviceName
+      name: Service
+      type: string
+    - jsonPath: .spec.dbInitSource
+      name: Init-Source
+      type: string
+    - jsonPath: .status.state
+      name: State
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: DbInitJob is the Schema for the dbinitjobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DbInitJobSpec defines the desired state of DbInitJob
+            properties:
+              databaseName:
+                description: Name of the database to initialise
+                maxLength: 63
+                type: string
+              dbInitSource:
+                description: Name of the staging site used to initialise the db
+                type: string
+              deadlineSeconds:
+                description: The number of seconds to use as the completion deadline
+                format: int64
+                type: integer
+              mongoEnvironment:
+                description: Name of the mongo environment to initialise
+                type: string
+              mysqlEnvironment:
+                description: Name of the mysql environment to initialise
+                type: string
+              password:
+                description: Password for the user used to connect to the databases
+                maxLength: 32
+                type: string
+              serviceName:
+                description: Name of the service.
+                type: string
+              siteName:
+                description: Name of the site owning this job
+                type: string
+              username:
+                description: Name of the user used to connect to the databases
+                maxLength: 16
+                type: string
+            required:
+            - databaseName
+            - dbInitSource
+            - deadlineSeconds
+            - password
+            - serviceName
+            - siteName
+            - username
+            type: object
+          status:
+            description: DbInitJobStatus defines the observed state of DbInitJob
+            properties:
+              deadlineTimestamp:
+                description: The deadline for the job's completion, after which the
+                  job will be marked as failed if it didn't run to completion yet
+                format: date-time
+                type: string
+              jobNotFoundCount:
+                default: 0
+                description: Number of consecutive times the related batch job failed
+                  to load
+                format: int32
+                type: integer
+              state:
+                default: Pending
+                description: State of the job
+                type: string
+            required:
+            - deadlineTimestamp
+            - jobNotFoundCount
+            - state
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,101 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: dbmigrationjobs.job.operator.kube-stager.io
+spec:
+  group: job.operator.kube-stager.io
+  names:
+    kind: DbMigrationJob
+    listKind: DbMigrationJobList
+    plural: dbmigrationjobs
+    singular: dbmigrationjob
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.siteName
+      name: Site
+      type: string
+    - jsonPath: .spec.serviceName
+      name: Service
+      type: string
+    - jsonPath: .spec.imageTag
+      name: Image-Tag
+      type: string
+    - jsonPath: .status.state
+      name: State
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: DbMigrationJob is the Schema for the dbmigrationjobs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DbMigrationJobSpec defines the desired state of DbMigrationJob
+            properties:
+              deadlineSeconds:
+                description: The number of seconds to use as the completion deadline
+                format: int64
+                type: integer
+              imageTag:
+                description: The tag for the images to use
+                type: string
+              serviceName:
+                description: Name of the service.
+                type: string
+              siteName:
+                description: Name of the site owning this job
+                type: string
+            required:
+            - deadlineSeconds
+            - imageTag
+            - serviceName
+            - siteName
+            type: object
+          status:
+            description: DbMigrationJobStatus defines the observed state of DbMigrationJob
+            properties:
+              deadlineTimestamp:
+                description: The deadline for the job's completion, after which the
+                  job will be marked as failed if it didn't run to completion yet
+                format: date-time
+                type: string
+              jobNotFoundCount:
+                default: 0
+                description: Number of consecutive times the related batch job failed
+                  to load
+                format: int32
+                type: integer
+              lastMigratedImageTag:
+                description: Name of the image that the last migration was executed
+                type: string
+              state:
+                default: Pending
+                description: State of the job
+                type: string
+            required:
+            - deadlineTimestamp
+            - jobNotFoundCount
+            - lastMigratedImageTag
+            - state
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,414 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: stagingsites.site.operator.kube-stager.io
+spec:
+  group: site.operator.kube-stager.io
+  names:
+    kind: StagingSite
+    listKind: StagingSiteList
+    plural: stagingsites
+    singular: stagingsite
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.dbName
+      name: DB
+      type: string
+    - jsonPath: .spec.username
+      name: Username
+      type: string
+    - jsonPath: .spec.dumpSourceEnvironmentName
+      name: Init-Source
+      type: string
+    - jsonPath: .spec.enabled
+      name: Enabled
+      type: boolean
+    - jsonPath: .status.state
+      name: State
+      type: string
+    - jsonPath: .status.workloadHealth
+      name: Workload-Health
+      type: string
+    - jsonPath: .status.nextBackupTime
+      name: Next-Backup
+      type: string
+    - jsonPath: .status.lastBackupTime
+      name: Last-Successful-Backup
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: StagingSite is the Schema for the stagingsites API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: StagingSiteSpec defines the desired state of StagingSite
+            properties:
+              backupBeforeDelete:
+                default: false
+                description: Whether to perform a database backup before deleting
+                  the site. Defaults to FALSE
+                type: boolean
+              dailyBackupWindowHour:
+                description: The hour for the daily backup window in UTC 24 hour time
+                  (0-23).
+                format: int32
+                type: integer
+              dbName:
+                description: The name of the databases to create (applies both to
+                  mysql and mongo). Defaults to the name of the staging site
+                maxLength: 63
+                minLength: 0
+                pattern: '[_a-zA-Z0-9]*'
+                type: string
+              deleteAfter:
+                description: The period after which the staging site will be automatically
+                  deleted (including it's database). Defaults to 7 days
+                properties:
+                  days:
+                    description: Number of days. All amounts are additive, so 1 day
+                      25 hours 90 minutes == 2 days 2 hour 30 minutes
+                    type: integer
+                  hours:
+                    description: Number of hours. All amounts are additive, so 1 day
+                      25 hours 90 minutes == 2 days 2 hour 30 minutes
+                    type: integer
+                  minutes:
+                    description: Number of minutes. All amounts are additive, so 1
+                      day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                    type: integer
+                  never:
+                    description: If TRUE the time range will never apply
+                    type: boolean
+                type: object
+              disableAfter:
+                description: The period after which the staging site will be automatically
+                  disabled (data left intact). Defaults to 2 days
+                properties:
+                  days:
+                    description: Number of days. All amounts are additive, so 1 day
+                      25 hours 90 minutes == 2 days 2 hour 30 minutes
+                    type: integer
+                  hours:
+                    description: Number of hours. All amounts are additive, so 1 day
+                      25 hours 90 minutes == 2 days 2 hour 30 minutes
+                    type: integer
+                  minutes:
+                    description: Number of minutes. All amounts are additive, so 1
+                      day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                    type: integer
+                  never:
+                    description: If TRUE the time range will never apply
+                    type: boolean
+                type: object
+              domainPrefix:
+                description: The domain prefix for the staging environment. Defaults
+                  to the name of the staging site
+                minLength: 0
+                type: string
+              enabled:
+                default: true
+                description: Whether to enable the staging site (run it's pods). Defaults
+                  to TRUE
+                type: boolean
+              includeAllServices:
+                default: false
+                description: If set to TRUE, all services will be included and deployed
+                  with this staging site. Defaults to FALSE
+                type: boolean
+              password:
+                description: The password to use for authentication (applies both
+                  to mysql and mongo). Defaults to a randomly generated password
+                maxLength: 32
+                minLength: 0
+                pattern: '[_a-zA-Z0-9]*'
+                type: string
+              services:
+                additionalProperties:
+                  properties:
+                    customTemplateValues:
+                      additionalProperties:
+                        type: string
+                      description: Any additional custom template value overrides
+                      type: object
+                    dumpSourceEnvironmentName:
+                      description: The name of the environment to initialise the database
+                        from. Defaults to "master"
+                      minLength: 0
+                      type: string
+                    extraEnvs:
+                      additionalProperties:
+                        type: string
+                      description: Any extra environment variables to set for the
+                        staging site.
+                      type: object
+                    imageTag:
+                      default: latest
+                      description: Tag of the image to deploy the file from. Will
+                        default to latest if not set.
+                      type: string
+                    includeInBackups:
+                      default: false
+                      description: Whether to include the service in backups. Defaults
+                        to FALSE
+                      type: boolean
+                    mongoEnvironment:
+                      description: Name of the mongodb environment to use for this
+                        service
+                      minLength: 1
+                      type: string
+                    mysqlEnvironment:
+                      description: Name of the mysql environment to use for this service
+                      minLength: 1
+                      type: string
+                    redisEnvironment:
+                      description: Name of the redis environment to use for this service
+                      minLength: 1
+                      type: string
+                    replicas:
+                      description: The replica count for this services deployment
+                      format: int32
+                      type: integer
+                    resourceOverrides:
+                      additionalProperties:
+                        description: ResourceRequirements describes the compute resource
+                          requirements.
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                      description: Override resource requirements for the containers
+                        in the service pods
+                      type: object
+                  type: object
+                description: The services used by the staging site
+                type: object
+              username:
+                description: The username to use for authentication (applies both
+                  to mysql and mongo). Defaults to the db name
+                maxLength: 16
+                minLength: 0
+                pattern: '[_a-zA-Z0-9]*'
+                type: string
+            type: object
+          status:
+            description: StagingSiteStatus defines the observed state of StagingSite
+            properties:
+              configsAreCreated:
+                description: Whether configuration type objects are created/updated
+                  (configmaps, secrets)
+                type: boolean
+              databaseCreationComplete:
+                description: Whether the database creation is complete
+                type: boolean
+              databaseInitialisationComplete:
+                description: Whether the database initialisation is complete
+                type: boolean
+              databaseMigrationsComplete:
+                description: Whether the database migrations have finished running
+                  everywhere
+                type: boolean
+              deleteAt:
+                description: The timestamp when the site will be automatically deleted
+                  at
+                format: date-time
+                type: string
+              disableAt:
+                description: The timestamp when the site will be automatically disabled
+                  at
+                format: date-time
+                type: string
+              enabled:
+                description: Whether the site is enabled or not. The automatic disabling
+                  sets this flag to false, but doesn't touch the spec one
+                type: boolean
+              errorMessage:
+                description: The error message associated with the Failed status
+                type: string
+              lastAppliedConfiguration:
+                description: The timestamp of the last applied configuration
+                format: date-time
+                type: string
+              lastBackupTime:
+                description: The time of the latest successful backup of the whole
+                  site
+                format: date-time
+                type: string
+              networkingObjectsAreCreated:
+                description: Whether networking type objects are created/updated (services,
+                  ingresses)
+                type: boolean
+              nextBackupTime:
+                description: The time the next backup is scheduled for
+                format: date-time
+                type: string
+              services:
+                additionalProperties:
+                  properties:
+                    databaseName:
+                      description: The database name to use for database connections
+                      type: string
+                    deploymentStatus:
+                      description: The status subentity of the created deployment
+                      properties:
+                        availableReplicas:
+                          description: Total number of available pods (ready for at
+                            least minReadySeconds) targeted by this deployment.
+                          format: int32
+                          type: integer
+                        collisionCount:
+                          description: Count of hash collisions for the Deployment.
+                            The Deployment controller uses this field as a collision
+                            avoidance mechanism when it needs to create the name for
+                            the newest ReplicaSet.
+                          format: int32
+                          type: integer
+                        conditions:
+                          description: Represents the latest available observations
+                            of a deployment's current state.
+                          items:
+                            description: DeploymentCondition describes the state of
+                              a deployment at a certain point.
+                            properties:
+                              lastTransitionTime:
+                                description: Last time the condition transitioned
+                                  from one status to another.
+                                format: date-time
+                                type: string
+                              lastUpdateTime:
+                                description: The last time this condition was updated.
+                                format: date-time
+                                type: string
+                              message:
+                                description: A human readable message indicating details
+                                  about the transition.
+                                type: string
+                              reason:
+                                description: The reason for the condition's last transition.
+                                type: string
+                              status:
+                                description: Status of the condition, one of True,
+                                  False, Unknown.
+                                type: string
+                              type:
+                                description: Type of deployment condition.
+                                type: string
+                            required:
+                            - status
+                            - type
+                            type: object
+                          type: array
+                        observedGeneration:
+                          description: The generation observed by the deployment controller.
+                          format: int64
+                          type: integer
+                        readyReplicas:
+                          description: readyReplicas is the number of pods targeted
+                            by this Deployment with a Ready Condition.
+                          format: int32
+                          type: integer
+                        replicas:
+                          description: Total number of non-terminated pods targeted
+                            by this deployment (their labels match the selector).
+                          format: int32
+                          type: integer
+                        unavailableReplicas:
+                          description: Total number of unavailable pods targeted by
+                            this deployment. This is the total number of pods that
+                            are still required for the deployment to have 100% available
+                            capacity. They may either be pods that are running but
+                            not yet available or pods that still have not been created.
+                          format: int32
+                          type: integer
+                        updatedReplicas:
+                          description: Total number of non-terminated pods targeted
+                            by this deployment that have the desired template spec.
+                          format: int32
+                          type: integer
+                      type: object
+                    redisDatabaseNumber:
+                      description: The database number to use for redis connections
+                      format: int32
+                      type: integer
+                    username:
+                      description: The username to use for database connections
+                      type: string
+                  required:
+                  - databaseName
+                  - redisDatabaseNumber
+                  type: object
+                description: The status for the services
+                type: object
+              state:
+                description: The global state of the site
+                enum:
+                - Pending
+                - Complete
+                - Failed
+                type: string
+              workloadHealth:
+                description: The combined health of the workloads related to this
+                  instance
+                enum:
+                - Healthy
+                - Unhealthy
+                - Incomplete
+                type: string
+              workloadsAreCreated:
+                description: Whether the workload objects are created and up to date
+                  (deployments)
+                type: boolean
+            required:
+            - configsAreCreated
+            - databaseCreationComplete
+            - databaseInitialisationComplete
+            - databaseMigrationsComplete
+            - enabled
+            - errorMessage
+            - networkingObjectsAreCreated
+            - state
+            - workloadHealth
+            - workloadsAreCreated
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
