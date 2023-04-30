@@ -40,7 +40,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Release
-      run: make docker-buildx VERSION=$GITHUB_REF_NAME
+      run: make docker-buildx VERSION=v0.0.1
 
     - name: List image
       run: |
