@@ -19,6 +19,9 @@ package main
 import (
 	"flag"
 	"github.com/getsentry/sentry-go"
+	"github.com/szeber/kube-stager/internal/controllers/job"
+	sitecontrollers "github.com/szeber/kube-stager/internal/controllers/site"
+	"github.com/szeber/kube-stager/internal/controllers/task"
 	"os"
 	"time"
 
@@ -42,9 +45,6 @@ import (
 	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
 	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
-	jobcontrollers "github.com/szeber/kube-stager/controllers/job"
-	sitecontrollers "github.com/szeber/kube-stager/controllers/site"
-	taskcontrollers "github.com/szeber/kube-stager/controllers/task"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -137,28 +137,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&taskcontrollers.MysqlDatabaseReconciler{
+	if err = (&task.MysqlDatabaseReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MysqlDatabase")
 		os.Exit(1)
 	}
-	if err = (&taskcontrollers.MongoDatabaseReconciler{
+	if err = (&task.MongoDatabaseReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDatabase")
 		os.Exit(1)
 	}
-	if err = (&taskcontrollers.RedisDatabaseReconciler{
+	if err = (&task.RedisDatabaseReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RedisDatabase")
 		os.Exit(1)
 	}
-	if err = (&jobcontrollers.DbInitJobReconciler{
+	if err = (&job.DbInitJobReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Config: ctrlConfig,
@@ -166,7 +166,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "DbInitJob")
 		os.Exit(1)
 	}
-	if err = (&jobcontrollers.DbMigrationJobReconciler{
+	if err = (&job.DbMigrationJobReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Config: ctrlConfig,
@@ -185,7 +185,7 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "StagingSite")
 		os.Exit(1)
 	}
-	if err = (&jobcontrollers.BackupReconciler{
+	if err = (&job.BackupReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Config: ctrlConfig,
