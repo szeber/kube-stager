@@ -23,6 +23,7 @@ import (
 	sitecontrollers "github.com/szeber/kube-stager/internal/controllers/site"
 	"github.com/szeber/kube-stager/internal/controllers/task"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -101,8 +102,7 @@ func main() {
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		LeaderElectionID:       "ec56737d.operator.kube-stager.io",
-		Port:                   9443,
-		MetricsBindAddress:     ":8080",
+		Metrics:                server.Options{BindAddress: ":8080"},
 		HealthProbeBindAddress: ":8081",
 		LeaderElection:         false,
 	}
