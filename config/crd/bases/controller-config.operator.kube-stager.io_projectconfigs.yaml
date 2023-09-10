@@ -76,6 +76,9 @@ spec:
                   in form with GroupKind.String(), e.g. ReplicaSet in apps group (regardless
                   of version) would be `ReplicaSet.apps`."
                 type: object
+              recoverPanic:
+                description: RecoverPanic indicates if panics should be recovered.
+                type: boolean
             type: object
           gracefulShutDown:
             description: GracefulShutdownTimeout is the duration given to runnable
@@ -89,7 +92,8 @@ spec:
             properties:
               healthProbeBindAddress:
                 description: HealthProbeBindAddress is the TCP address that the controller
-                  should bind to for serving health probes
+                  should bind to for serving health probes It can be set to "0" or
+                  "" to disable serving the health probe.
                 type: string
               livenessEndpointName:
                 description: LivenessEndpointName, defaults to "healthz"
@@ -179,7 +183,7 @@ spec:
           metadata:
             type: object
           metrics:
-            description: Metrics contains thw controller metrics configuration
+            description: Metrics contains the controller metrics configuration
             properties:
               bindAddress:
                 description: BindAddress is the TCP address that the controller should
