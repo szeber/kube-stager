@@ -262,14 +262,7 @@ func (r *DbMigrationJobReconciler) createJob(
 		labels.Service: job.Spec.ServiceName,
 	}
 	templateHandler := template.NewSite(site, *serviceConfig)
-	err = template.LoadConfigs(
-		&templateHandler,
-		ctx,
-		r,
-		site.Spec.Services[serviceConfig.Name].MysqlEnvironment,
-		site.Spec.Services[serviceConfig.Name].MongoEnvironment,
-		site.Spec.Services[serviceConfig.Name].RedisEnvironment,
-	)
+	err = template.LoadConfigs(&templateHandler, ctx, r)
 	if nil != err {
 		return nil, err
 	}

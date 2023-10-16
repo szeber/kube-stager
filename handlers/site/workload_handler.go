@@ -154,14 +154,7 @@ func (r WorkloadHandler) createDeployment(
 	ctx context.Context,
 ) (*appsv1.Deployment, error) {
 	templateHandler := template.NewSite(*site, *serviceConfig)
-	err := template.LoadConfigs(
-		&templateHandler,
-		ctx,
-		r.Reader,
-		site.GetMysqlConfigForService(*serviceConfig),
-		site.GetMongoConfigForService(*serviceConfig),
-		site.GetRedisConfigForService(*serviceConfig),
-	)
+	err := template.LoadConfigs(&templateHandler, ctx, r.Reader)
 	if nil != err {
 		return nil, err
 	}
