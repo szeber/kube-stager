@@ -2,7 +2,7 @@ package task
 
 import (
 	"context"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
 )
 
 type TaskHandler interface {

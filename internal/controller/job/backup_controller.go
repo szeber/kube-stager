@@ -21,14 +21,15 @@ import (
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	"github.com/go-logr/logr"
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	controllerconfigv1 "github.com/szeber/kube-stager/apis/controller-config/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	controllerconfigv1 "github.com/szeber/kube-stager/api/controller-config/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
+	"github.com/szeber/kube-stager/handlers/importer"
 	"github.com/szeber/kube-stager/handlers/template"
 	"github.com/szeber/kube-stager/helpers"
 	"github.com/szeber/kube-stager/helpers/labels"
 	"github.com/szeber/kube-stager/helpers/pod"
-	"github.com/szeber/kube-stager/internal/controllers"
+	"github.com/szeber/kube-stager/internal/controller"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,14 +40,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
+	jobv1 "github.com/szeber/kube-stager/api/job/v1"
 )
 
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Config controllerconfigv1.ProjectConfig
+	Scheme        *runtime.Scheme
+	Config        controllerconfigv1.ProjectConfig
+	ImportHandler *importer.ImportHandler
 	Clock
 }
 
@@ -81,6 +83,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func (r *BackupReconciler) doReconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+
+	if r.ImportHandler.IsObjectBeingImported(importer.TYPE_BACKUP_JOB, req.NamespacedName) {
+		logger.Info("Skipping job as import is in progress")
+
+		return ctrl.Result{}, nil
+	}
 
 	job := &jobv1.Backup{}
 

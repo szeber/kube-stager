@@ -1,0 +1,12 @@
+apiVersion: importer.operator.kube-stager.io/v1
+kind: ImportExportData
+metadata:
+  labels:
+    app.kubernetes.io/name: importexportdata
+    app.kubernetes.io/instance: importexportdata-sample
+    app.kubernetes.io/part-of: kube-stager
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-stager
+  name: importexportdata-sample
+spec:
+  # TODO(user): Add fields here

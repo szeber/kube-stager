@@ -3,9 +3,9 @@ package template
 import (
 	"context"
 	"fmt"
-	api "github.com/szeber/kube-stager/apis"
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	api "github.com/szeber/kube-stager/api"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

@@ -1,8 +1,8 @@
 package pod
 
 import (
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sort"
 )

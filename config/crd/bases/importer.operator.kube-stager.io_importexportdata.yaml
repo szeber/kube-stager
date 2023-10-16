@@ -1,0 +1,250 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: importexportdata.importer.operator.kube-stager.io
+spec:
+  group: importer.operator.kube-stager.io
+  names:
+    kind: ImportExportData
+    listKind: ImportExportDataList
+    plural: importexportdata
+    singular: importexportdata
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ImportExportData is the Schema for the importexportdata API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ImportExportDataSpec defines the desired state of ImportExportData
+            properties:
+              redisDatabase:
+                description: TEMP
+                type: integer
+              siteSpec:
+                description: The spec of the site
+                properties:
+                  backupBeforeDelete:
+                    default: false
+                    description: Whether to perform a database backup before deleting
+                      the site. Defaults to FALSE
+                    type: boolean
+                  dailyBackupWindowHour:
+                    description: The hour for the daily backup window in UTC 24 hour
+                      time (0-23).
+                    format: int32
+                    type: integer
+                  dbName:
+                    description: The name of the databases to create (applies both
+                      to mysql and mongo). Defaults to the name of the staging site
+                    maxLength: 63
+                    minLength: 0
+                    pattern: '[_a-zA-Z0-9]*'
+                    type: string
+                  deleteAfter:
+                    description: The period after which the staging site will be automatically
+                      deleted (including it's database). Defaults to 7 days
+                    properties:
+                      days:
+                        description: Number of days. All amounts are additive, so
+                          1 day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                        type: integer
+                      hours:
+                        description: Number of hours. All amounts are additive, so
+                          1 day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                        type: integer
+                      minutes:
+                        description: Number of minutes. All amounts are additive,
+                          so 1 day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                        type: integer
+                      never:
+                        description: If TRUE the time range will never apply
+                        type: boolean
+                    type: object
+                  disableAfter:
+                    description: The period after which the staging site will be automatically
+                      disabled (data left intact). Defaults to 2 days
+                    properties:
+                      days:
+                        description: Number of days. All amounts are additive, so
+                          1 day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                        type: integer
+                      hours:
+                        description: Number of hours. All amounts are additive, so
+                          1 day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                        type: integer
+                      minutes:
+                        description: Number of minutes. All amounts are additive,
+                          so 1 day 25 hours 90 minutes == 2 days 2 hour 30 minutes
+                        type: integer
+                      never:
+                        description: If TRUE the time range will never apply
+                        type: boolean
+                    type: object
+                  domainPrefix:
+                    description: The domain prefix for the staging environment. Defaults
+                      to the name of the staging site
+                    minLength: 0
+                    type: string
+                  enabled:
+                    default: true
+                    description: Whether to enable the staging site (run it's pods).
+                      Defaults to TRUE
+                    type: boolean
+                  includeAllServices:
+                    default: false
+                    description: If set to TRUE, all services will be included and
+                      deployed with this staging site. Defaults to FALSE
+                    type: boolean
+                  password:
+                    description: The password to use for authentication (applies both
+                      to mysql and mongo). Defaults to a randomly generated password
+                    maxLength: 32
+                    minLength: 0
+                    pattern: '[_a-zA-Z0-9]*'
+                    type: string
+                  services:
+                    additionalProperties:
+                      properties:
+                        customTemplateValues:
+                          additionalProperties:
+                            type: string
+                          description: Any additional custom template value overrides
+                          type: object
+                        dumpSourceEnvironmentName:
+                          description: The name of the environment to initialise the
+                            database from. Defaults to "master"
+                          minLength: 0
+                          type: string
+                        extraEnvs:
+                          additionalProperties:
+                            type: string
+                          description: Any extra environment variables to set for
+                            the staging site.
+                          type: object
+                        imageTag:
+                          default: latest
+                          description: Tag of the image to deploy the file from. Will
+                            default to latest if not set.
+                          type: string
+                        includeInBackups:
+                          default: false
+                          description: Whether to include the service in backups.
+                            Defaults to FALSE
+                          type: boolean
+                        mongoEnvironment:
+                          description: Name of the mongodb environment to use for
+                            this service
+                          minLength: 1
+                          type: string
+                        mysqlEnvironment:
+                          description: Name of the mysql environment to use for this
+                            service
+                          minLength: 1
+                          type: string
+                        redisEnvironment:
+                          description: Name of the redis environment to use for this
+                            service
+                          minLength: 1
+                          type: string
+                        replicas:
+                          description: The replica count for this services deployment
+                          format: int32
+                          type: integer
+                        resourceOverrides:
+                          additionalProperties:
+                            description: ResourceRequirements describes the compute
+                              resource requirements.
+                            properties:
+                              claims:
+                                description: "Claims lists the names of resources,
+                                  defined in spec.resourceClaims, that are used by
+                                  this container. \n This is an alpha field and requires
+                                  enabling the DynamicResourceAllocation feature gate.
+                                  \n This field is immutable. It can only be set for
+                                  containers."
+                                items:
+                                  description: ResourceClaim references one entry
+                                    in PodSpec.ResourceClaims.
+                                  properties:
+                                    name:
+                                      description: Name must match the name of one
+                                        entry in pod.spec.resourceClaims of the Pod
+                                        where this field is used. It makes that resource
+                                        available inside a container.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                                x-kubernetes-list-map-keys:
+                                - name
+                                x-kubernetes-list-type: map
+                              limits:
+                                additionalProperties:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                description: 'Limits describes the maximum amount
+                                  of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                type: object
+                              requests:
+                                additionalProperties:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                description: 'Requests describes the minimum amount
+                                  of compute resources required. If Requests is omitted
+                                  for a container, it defaults to Limits if that is
+                                  explicitly specified, otherwise to an implementation-defined
+                                  value. Requests cannot exceed Limits. More info:
+                                  https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                type: object
+                            type: object
+                          description: Override resource requirements for the containers
+                            in the service pods
+                          type: object
+                      type: object
+                    description: The services used by the staging site
+                    type: object
+                  username:
+                    description: The username to use for authentication (applies both
+                      to mysql and mongo). Defaults to the db name
+                    maxLength: 16
+                    minLength: 0
+                    pattern: '[_a-zA-Z0-9]*'
+                    type: string
+                type: object
+            required:
+            - redisDatabase
+            - siteSpec
+            type: object
+          status:
+            description: ImportExportDataStatus defines the observed state of ImportExportData
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

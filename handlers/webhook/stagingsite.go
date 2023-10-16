@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
 	"github.com/szeber/kube-stager/helpers"
 	"github.com/szeber/kube-stager/helpers/kubernetes"
 	"github.com/szeber/kube-stager/helpers/labels"
@@ -139,17 +139,17 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 	r.updatePrefixedLabels(
 		site,
 		labels.MongoEnvironmentsPrefix,
-		helpers.GetKeysFromStringBoolMap(usedMongoEnvironmentNames),
+		helpers.GetKeysFromMap(usedMongoEnvironmentNames),
 	)
 	r.updatePrefixedLabels(
 		site,
 		labels.MysqlEnvironmentsPrefix,
-		helpers.GetKeysFromStringBoolMap(usedMysqlEnvironmentNames),
+		helpers.GetKeysFromMap(usedMysqlEnvironmentNames),
 	)
 	r.updatePrefixedLabels(
 		site,
 		labels.RedisEnvironmentsPrefix,
-		helpers.GetKeysFromStringBoolMap(usedRedisEnvironmentNames),
+		helpers.GetKeysFromMap(usedRedisEnvironmentNames),
 	)
 	r.updatePrefixedLabels(site, labels.ServicesPrefix, serviceNames)
 

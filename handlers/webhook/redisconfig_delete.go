@@ -3,8 +3,8 @@ package webhook
 import (
 	"context"
 	"fmt"
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
 	"github.com/szeber/kube-stager/helpers/indexes"
 	"github.com/szeber/kube-stager/helpers/labels"
 	"net/http"

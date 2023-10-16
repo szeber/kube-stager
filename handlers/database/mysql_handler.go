@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	_ "github.com/go-sql-driver/mysql"
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	taskv1 "github.com/szeber/kube-stager/api/task/v1"
 )
 
 type mysqlReconcileTask struct {

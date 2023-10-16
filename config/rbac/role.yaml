@@ -87,6 +87,32 @@ rules:
   - update
   - watch
 - apiGroups:
+  - importer.operator.kube-stager.io
+  resources:
+  - importexportdata
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - importer.operator.kube-stager.io
+  resources:
+  - importexportdata/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - importer.operator.kube-stager.io
+  resources:
+  - importexportdata/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - job.operator.kube-stager.io
   resources:
   - backups

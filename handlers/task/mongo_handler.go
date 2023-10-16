@@ -2,9 +2,9 @@ package task
 
 import (
 	"context"
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
-	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
+	taskv1 "github.com/szeber/kube-stager/api/task/v1"
 	"github.com/szeber/kube-stager/helpers/errors"
 	"github.com/szeber/kube-stager/helpers/labels"
 	"k8s.io/apimachinery/pkg/runtime"

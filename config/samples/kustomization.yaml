@@ -12,4 +12,6 @@ resources:
 - job_v1_dbinitjob.yaml
 - job_v1_dbmigrationjob.yaml
 - controller-config_v1_projectconfig.yaml
+- import_v1_importexportdata.yaml
+- importer_v1_importexportdata.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

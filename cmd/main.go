@@ -18,13 +18,15 @@ package main
 
 import (
 	"flag"
-	"github.com/getsentry/sentry-go"
-	"github.com/szeber/kube-stager/internal/controllers/job"
-	sitecontrollers "github.com/szeber/kube-stager/internal/controllers/site"
-	"github.com/szeber/kube-stager/internal/controllers/task"
+``	"github.com/szeber/kube-stager/handlers/importer"
+	job2 "github.com/szeber/kube-stager/internal/controller/job"
+	sitecontrollers "github.com/szeber/kube-stager/internal/controller/site"
+	task2 "github.com/szeber/kube-stager/internal/controller/task"
 	"os"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"time"
+
+	"github.com/getsentry/sentry-go"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -41,11 +43,13 @@ import (
 
 	webhook2 "github.com/szeber/kube-stager/handlers/webhook"
 
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	controllerconfigv1 "github.com/szeber/kube-stager/apis/controller-config/v1"
-	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
-	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
+	controllerconfigv1 "github.com/szeber/kube-stager/api/controller-config/v1"
+	importerv1 "github.com/szeber/kube-stager/api/importer/v1"
+	jobv1 "github.com/szeber/kube-stager/api/job/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
+	taskv1 "github.com/szeber/kube-stager/api/task/v1"
+	importercontroller "github.com/szeber/kube-stager/internal/controller/importer"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -62,6 +66,7 @@ func init() {
 	utilruntime.Must(jobv1.AddToScheme(scheme))
 	utilruntime.Must(sitev1.AddToScheme(scheme))
 	utilruntime.Must(controllerconfigv1.AddToScheme(scheme))
+	utilruntime.Must(importerv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -137,46 +142,54 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&task.MysqlDatabaseReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	importHandler := importer.NewImportHandler(30, nil)
+
+	if err = (&task2.MysqlDatabaseReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MysqlDatabase")
 		os.Exit(1)
 	}
-	if err = (&task.MongoDatabaseReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	if err = (&task2.MongoDatabaseReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MongoDatabase")
 		os.Exit(1)
 	}
-	if err = (&task.RedisDatabaseReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	if err = (&task2.RedisDatabaseReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RedisDatabase")
 		os.Exit(1)
 	}
-	if err = (&job.DbInitJobReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Config: ctrlConfig,
+	if err = (&job2.DbInitJobReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		Config:        ctrlConfig,
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DbInitJob")
 		os.Exit(1)
 	}
-	if err = (&job.DbMigrationJobReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Config: ctrlConfig,
+	if err = (&job2.DbMigrationJobReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		Config:        ctrlConfig,
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DbMigrationJob")
 		os.Exit(1)
 	}
 	if err = (&sitecontrollers.StagingSiteReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StagingSite")
 		os.Exit(1)
@@ -185,12 +198,21 @@ func main() {
 		setupLog.Error(err, "unable to create webhook", "webhook", "StagingSite")
 		os.Exit(1)
 	}
-	if err = (&job.BackupReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Config: ctrlConfig,
+	if err = (&job2.BackupReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		Config:        ctrlConfig,
+		ImportHandler: importHandler,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
+		os.Exit(1)
+	}
+	if err = (&importercontroller.ImportExportDataReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		ImportHandler: importHandler,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ImportExportData")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

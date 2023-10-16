@@ -2,7 +2,7 @@ package kubernetes
 
 import (
 	"context"
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
+	configv1 "github.com/szeber/kube-stager/api/config/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

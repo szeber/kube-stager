@@ -3,7 +3,7 @@ package webhook
 import (
 	"context"
 	"fmt"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	sitev1 "github.com/szeber/kube-stager/api/site/v1"
 	"github.com/szeber/kube-stager/helpers/labels"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
