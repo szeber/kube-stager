@@ -10,9 +10,12 @@ import (
 )
 
 type DatabaseHandler interface {
-	SetMysql(config configv1.MysqlConfig)
-	SetMongo(config configv1.MongoConfig)
-	SetRedis(config configv1.RedisConfig)
+	SetMysql(config map[string]configv1.MysqlConfig)
+	SetMongo(config map[string]configv1.MongoConfig)
+	SetRedis(config map[string]configv1.RedisConfig)
+	GetMysql() map[string]configv1.MysqlConfig
+	GetMongo() map[string]configv1.MongoConfig
+	GetRedis() map[string]configv1.RedisConfig
 	SetServiceConfigs(configs map[string]configv1.ServiceConfig)
 	SetServiceConfig(name string, config configv1.ServiceConfig)
 	getNamespace() string
@@ -24,9 +27,9 @@ type SiteTemplateHandler struct {
 	siteServiceStatus    sitev1.StagingSiteServiceStatus
 	currentServiceConfig configv1.ServiceConfig
 	serviceConfigs       map[string]configv1.ServiceConfig
-	mysqlConfig          configv1.MysqlConfig
-	mongoConfig          configv1.MongoConfig
-	redisConfig          configv1.RedisConfig
+	mysqlConfigs         map[string]configv1.MysqlConfig
+	mongoConfigs         map[string]configv1.MongoConfig
+	redisConfigs         map[string]configv1.RedisConfig
 }
 
 func NewSite(site sitev1.StagingSite, serviceConfig configv1.ServiceConfig) SiteTemplateHandler {
@@ -38,39 +41,72 @@ func NewSite(site sitev1.StagingSite, serviceConfig configv1.ServiceConfig) Site
 	}
 }
 
-func LoadConfigs(
-	handler DatabaseHandler,
-	ctx context.Context,
-	reader client.Reader,
-	mysqlConfigName string,
-	mongoConfigName string,
-	redisConfigName string,
-) error {
+func LoadConfigs(handler DatabaseHandler, ctx context.Context, reader client.Reader) error {
 	namespace := handler.getNamespace()
 
-	if "" != mongoConfigName {
-		config := configv1.MongoConfig{}
-		if err := reader.Get(ctx, client.ObjectKey{Namespace: namespace, Name: mongoConfigName}, &config); nil != err {
-			return err
-		}
-		handler.SetMongo(config)
+	mongoConfigs, err := ListMongoConfigsInNamespace(namespace, ctx, reader)
+	if nil != err {
+		return err
 	}
-	if "" != mysqlConfigName {
-		config := configv1.MysqlConfig{}
-		if err := reader.Get(ctx, client.ObjectKey{Namespace: namespace, Name: mysqlConfigName}, &config); nil != err {
-			return err
-		}
-		handler.SetMysql(config)
+	handler.SetMongo(mongoConfigs)
+
+	mysqlConfigs, err := ListMysqlConfigsInNamespace(namespace, ctx, reader)
+	if nil != err {
+		return err
 	}
-	if "" != redisConfigName {
-		config := configv1.RedisConfig{}
-		if err := reader.Get(ctx, client.ObjectKey{Namespace: namespace, Name: redisConfigName}, &config); nil != err {
-			return err
-		}
-		handler.SetRedis(config)
+	handler.SetMysql(mysqlConfigs)
+
+	redisConfigs, err := ListRedisConfigsInNamespace(namespace, ctx, reader)
+	if nil != err {
+		return err
 	}
+	handler.SetRedis(redisConfigs)
 
 	return LoadServiceConfigs(handler, ctx, reader)
+}
+
+func ListMongoConfigsInNamespace(namespace string, ctx context.Context, reader client.Reader) (map[string]configv1.MongoConfig, error) {
+	configs := make(map[string]configv1.MongoConfig)
+	list := configv1.MongoConfigList{}
+
+	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); nil != err {
+		return configs, err
+	}
+
+	for _, config := range list.Items {
+		configs[config.Name] = config
+	}
+
+	return configs, nil
+}
+
+func ListMysqlConfigsInNamespace(namespace string, ctx context.Context, reader client.Reader) (map[string]configv1.MysqlConfig, error) {
+	list := configv1.MysqlConfigList{}
+	configs := make(map[string]configv1.MysqlConfig)
+
+	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); nil != err {
+		return configs, err
+	}
+
+	for _, config := range list.Items {
+		configs[config.Name] = config
+	}
+	return configs, nil
+}
+
+func ListRedisConfigsInNamespace(namespace string, ctx context.Context, reader client.Reader) (map[string]configv1.RedisConfig, error) {
+	list := configv1.RedisConfigList{}
+	configs := make(map[string]configv1.RedisConfig)
+
+	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); nil != err {
+		return configs, err
+	}
+
+	for _, config := range list.Items {
+		configs[config.Name] = config
+	}
+
+	return configs, nil
 }
 
 func LoadServiceConfigs(handler DatabaseHandler, ctx context.Context, reader client.Reader) error {
@@ -89,16 +125,28 @@ func LoadServiceConfigs(handler DatabaseHandler, ctx context.Context, reader cli
 	return nil
 }
 
-func (r *SiteTemplateHandler) SetMysql(config configv1.MysqlConfig) {
-	r.mysqlConfig = config
+func (r *SiteTemplateHandler) SetMysql(configs map[string]configv1.MysqlConfig) {
+	r.mysqlConfigs = configs
 }
 
-func (r *SiteTemplateHandler) SetMongo(config configv1.MongoConfig) {
-	r.mongoConfig = config
+func (r *SiteTemplateHandler) SetMongo(configs map[string]configv1.MongoConfig) {
+	r.mongoConfigs = configs
 }
 
-func (r *SiteTemplateHandler) SetRedis(config configv1.RedisConfig) {
-	r.redisConfig = config
+func (r *SiteTemplateHandler) SetRedis(configs map[string]configv1.RedisConfig) {
+	r.redisConfigs = configs
+}
+
+func (r *SiteTemplateHandler) GetMysql() map[string]configv1.MysqlConfig {
+	return r.mysqlConfigs
+}
+
+func (r *SiteTemplateHandler) GetMongo() map[string]configv1.MongoConfig {
+	return r.mongoConfigs
+}
+
+func (r *SiteTemplateHandler) GetRedis() map[string]configv1.RedisConfig {
+	return r.redisConfigs
 }
 
 func (r *SiteTemplateHandler) SetServiceConfigs(configs map[string]configv1.ServiceConfig) {
@@ -128,27 +176,22 @@ func (r *SiteTemplateHandler) GetTemplateValues() map[string]string {
 		"database.initSource":     r.siteServiceSpec.DbInitSourceEnvironmentName,
 	}
 
-	if "" != r.mysqlConfig.Name {
-		result["database.mysql.host"] = r.mysqlConfig.Spec.Host
-		result["database.mysql.port"] = fmt.Sprintf("%d", r.mysqlConfig.Spec.Port)
-	}
-
-	if "" != r.mongoConfig.Name {
-		result["database.mongo.host1"] = r.mongoConfig.Spec.Host1
-		result["database.mongo.host2"] = r.mongoConfig.Spec.Host2
-		result["database.mongo.host3"] = r.mongoConfig.Spec.Host3
-		result["database.mongo.port"] = fmt.Sprintf("%d", r.mongoConfig.Spec.Port)
-	}
-
-	if "" != r.redisConfig.Name {
-		scheme := "tcp"
-		if nil != r.redisConfig.Spec.IsTlsEnabled && *r.redisConfig.Spec.IsTlsEnabled {
-			scheme = "tls"
+	if "" != r.siteServiceSpec.MysqlEnvironment {
+		for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs[r.siteServiceSpec.MysqlEnvironment]) {
+			result[k] = v
 		}
-		result["database.redis.scheme"] = scheme
-		result["database.redis.host"] = r.redisConfig.Spec.Host
-		result["database.redis.port"] = fmt.Sprintf("%d", r.redisConfig.Spec.Port)
-		result["database.redis.password"] = r.redisConfig.Spec.Password
+	}
+
+	if "" != r.siteServiceSpec.MongoEnvironment {
+		for k, v := range r.getMongoConfigTemplateValues(r.mongoConfigs[r.siteServiceSpec.MongoEnvironment]) {
+			result[k] = v
+		}
+	}
+
+	if "" != r.siteServiceSpec.RedisEnvironment {
+		for k, v := range r.getRedisConfigTemplateValues(r.redisConfigs[r.siteServiceSpec.RedisEnvironment]) {
+			result[k] = v
+		}
 	}
 
 	for name := range r.currentServiceConfig.Spec.ConfigMaps {
@@ -165,7 +208,57 @@ func (r *SiteTemplateHandler) GetTemplateValues() map[string]string {
 
 	for name, config := range r.serviceConfigs {
 		result["service."+name+".clusterUrl"] = api.MakeServiceUrl(&r.site, config.Spec.ShortName)
+		if "" != r.site.Spec.Services[name].MysqlEnvironment {
+			for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs[r.site.Spec.Services[name].MysqlEnvironment]) {
+				result[fmt.Sprintf("service.%s.%s", name, k)] = v
+			}
+		}
+		if "" != r.site.Spec.Services[name].MongoEnvironment {
+			for k, v := range r.getMongoConfigTemplateValues(r.mongoConfigs[r.site.Spec.Services[name].MongoEnvironment]) {
+				result[fmt.Sprintf("service.%s.%s", name, k)] = v
+			}
+		}
+		if "" != r.site.Spec.Services[name].RedisEnvironment {
+			for k, v := range r.getRedisConfigTemplateValues(r.redisConfigs[r.site.Spec.Services[name].RedisEnvironment]) {
+				result[fmt.Sprintf("service.%s.%s", name, k)] = v
+			}
+		}
 	}
+
+	return result
+}
+
+func (r *SiteTemplateHandler) getMysqlConfigTemplateValues(mysqlConfig configv1.MysqlConfig) map[string]string {
+	result := make(map[string]string)
+
+	result["database.mysql.host"] = mysqlConfig.Spec.Host
+	result["database.mysql.port"] = fmt.Sprintf("%d", mysqlConfig.Spec.Port)
+
+	return result
+}
+
+func (r *SiteTemplateHandler) getMongoConfigTemplateValues(mongoConfig configv1.MongoConfig) map[string]string {
+	result := make(map[string]string)
+
+	result["database.mongo.host1"] = mongoConfig.Spec.Host1
+	result["database.mongo.host2"] = mongoConfig.Spec.Host2
+	result["database.mongo.host3"] = mongoConfig.Spec.Host3
+	result["database.mongo.port"] = fmt.Sprintf("%d", mongoConfig.Spec.Port)
+
+	return result
+}
+
+func (r *SiteTemplateHandler) getRedisConfigTemplateValues(redisConfig configv1.RedisConfig) map[string]string {
+	result := make(map[string]string)
+
+	scheme := "tcp"
+	if nil != redisConfig.Spec.IsTlsEnabled && *redisConfig.Spec.IsTlsEnabled {
+		scheme = "tls"
+	}
+	result["database.redis.scheme"] = scheme
+	result["database.redis.host"] = redisConfig.Spec.Host
+	result["database.redis.port"] = fmt.Sprintf("%d", redisConfig.Spec.Port)
+	result["database.redis.password"] = redisConfig.Spec.Password
 
 	return result
 }

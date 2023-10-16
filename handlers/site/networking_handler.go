@@ -202,14 +202,7 @@ func (r NetworkingHandler) createService(
 	config *configv1.ServiceConfig,
 ) (corev1.Service, error) {
 	siteTemplateHandler := template.NewSite(*site, *config)
-	err := template.LoadConfigs(
-		&siteTemplateHandler,
-		ctx,
-		r.Reader,
-		site.Spec.Services[config.Name].MysqlEnvironment,
-		site.Spec.Services[config.Name].MongoEnvironment,
-		site.Spec.Services[config.Name].RedisEnvironment,
-	)
+	err := template.LoadConfigs(&siteTemplateHandler, ctx, r.Reader)
 	if nil != err {
 		return corev1.Service{}, err
 	}
@@ -246,14 +239,7 @@ func (r NetworkingHandler) createIngress(
 	config *configv1.ServiceConfig,
 ) (networkingv1.Ingress, error) {
 	siteTemplateHandler := template.NewSite(*site, *config)
-	err := template.LoadConfigs(
-		&siteTemplateHandler,
-		ctx,
-		r.Reader,
-		site.Spec.Services[config.Name].MysqlEnvironment,
-		site.Spec.Services[config.Name].MongoEnvironment,
-		site.Spec.Services[config.Name].RedisEnvironment,
-	)
+	err := template.LoadConfigs(&siteTemplateHandler, ctx, r.Reader)
 	if nil != err {
 		return networkingv1.Ingress{}, err
 	}
