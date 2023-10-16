@@ -131,14 +131,7 @@ func (r ConfigHandler) createConfigMap(
 	data map[string]string,
 ) (corev1.ConfigMap, error) {
 	templateHandler := template.NewSite(*site, *config)
-	err := template.LoadConfigs(
-		&templateHandler,
-		ctx,
-		r.Reader,
-		site.Spec.Services[config.Name].MysqlEnvironment,
-		site.Spec.Services[config.Name].MongoEnvironment,
-		site.Spec.Services[config.Name].RedisEnvironment,
-	)
+	err := template.LoadConfigs(&templateHandler, ctx, r.Reader)
 	if nil != err {
 		return corev1.ConfigMap{}, err
 	}
