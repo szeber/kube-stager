@@ -166,14 +166,13 @@ func (r *SiteTemplateHandler) getNamespace() string {
 
 func (r *SiteTemplateHandler) GetTemplateValues() map[string]string {
 	result := map[string]string{
-		"site.name":               r.site.Name,
-		"site.domainPrefix":       r.site.Spec.DomainPrefix,
-		"site.imageTag":           r.siteServiceSpec.ImageTag,
-		"database.username":       r.siteServiceStatus.Username,
-		"database.name":           r.siteServiceStatus.DbName,
-		"database.password":       r.site.Spec.Password,
-		"database.redis.database": fmt.Sprintf("%d", r.siteServiceStatus.RedisDatabaseNumber),
-		"database.initSource":     r.siteServiceSpec.DbInitSourceEnvironmentName,
+		"site.name":         r.site.Name,
+		"site.domainPrefix": r.site.Spec.DomainPrefix,
+		"site.imageTag":     r.siteServiceSpec.ImageTag,
+	}
+
+	for k, v := range r.getCommonDatabaseConfigTemplateValues(r.siteServiceStatus, r.siteServiceSpec) {
+		result[k] = v
 	}
 
 	if "" != r.siteServiceSpec.MysqlEnvironment {
@@ -208,6 +207,11 @@ func (r *SiteTemplateHandler) GetTemplateValues() map[string]string {
 
 	for name, config := range r.serviceConfigs {
 		result["service."+name+".clusterUrl"] = api.MakeServiceUrl(&r.site, config.Spec.ShortName)
+
+		for k, v := range r.getCommonDatabaseConfigTemplateValues(r.site.Status.Services[name], r.site.Spec.Services[name]) {
+			result[fmt.Sprintf("service.%s.%s", name, k)] = v
+		}
+
 		if "" != r.site.Spec.Services[name].MysqlEnvironment {
 			for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs[r.site.Spec.Services[name].MysqlEnvironment]) {
 				result[fmt.Sprintf("service.%s.%s", name, k)] = v
@@ -259,6 +263,18 @@ func (r *SiteTemplateHandler) getRedisConfigTemplateValues(redisConfig configv1.
 	result["database.redis.host"] = redisConfig.Spec.Host
 	result["database.redis.port"] = fmt.Sprintf("%d", redisConfig.Spec.Port)
 	result["database.redis.password"] = redisConfig.Spec.Password
+
+	return result
+}
+
+func (r *SiteTemplateHandler) getCommonDatabaseConfigTemplateValues(serviceStatus sitev1.StagingSiteServiceStatus, serviceSpec sitev1.StagingSiteService) map[string]string {
+	result := map[string]string{
+		"database.username":       serviceStatus.Username,
+		"database.name":           serviceStatus.DbName,
+		"database.password":       r.site.Spec.Password,
+		"database.redis.database": fmt.Sprintf("%d", serviceStatus.RedisDatabaseNumber),
+		"database.initSource":     serviceSpec.DbInitSourceEnvironmentName,
+	}
 
 	return result
 }
