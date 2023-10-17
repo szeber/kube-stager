@@ -32,6 +32,17 @@ func ReplaceTemplateVariablesInString(s string, templates ...TemplateValueGetter
 	return s
 }
 
+func GetTemplateVariables(templates ...TemplateValueGetter) []string {
+	result := []string{}
+	for _, i := range templates {
+		for name, _ := range i.GetTemplateValues() {
+			result = append(result, name)
+		}
+	}
+
+	return result
+}
+
 func ReplaceTemplateVariablesInStringMap(
 	stringMap map[string]string,
 	entityType string,
@@ -44,8 +55,9 @@ func ReplaceTemplateVariablesInStringMap(
 
 		if len(unresolvedTemplates) > 0 {
 			return stringMap, errors.UnresolvedTemplatesError{
-				TemplateVariables: unresolvedTemplates,
-				EntityType:        entityType,
+				UnresolvedTemplateVariables: unresolvedTemplates,
+				AvailableTemplateVariables:  GetTemplateVariables(templates...),
+				EntityType:                  entityType,
 			}
 		}
 
@@ -81,7 +93,11 @@ func ReplaceTemplateVariablesInPodSpec(spec corev1.PodSpec, templates ...Templat
 	unresolvedTemplates := GetUnresolvedTemplatesFromString(replacedMarshalledSpec)
 
 	if len(unresolvedTemplates) > 0 {
-		return spec, errors.UnresolvedTemplatesError{TemplateVariables: unresolvedTemplates, EntityType: "pod spec"}
+		return spec, errors.UnresolvedTemplatesError{
+			UnresolvedTemplateVariables: unresolvedTemplates,
+			AvailableTemplateVariables:  GetTemplateVariables(templates...),
+			EntityType:                  "pod spec",
+		}
 	}
 
 	err = yaml.Unmarshal([]byte(replacedMarshalledSpec), &pod)
@@ -107,7 +123,11 @@ func ReplaceTemplateVariablesInServiceSpec(
 	unresolvedTemplates := GetUnresolvedTemplatesFromString(replacedMarshalledSpec)
 
 	if len(unresolvedTemplates) > 0 {
-		return spec, errors.UnresolvedTemplatesError{TemplateVariables: unresolvedTemplates, EntityType: "service spec"}
+		return spec, errors.UnresolvedTemplatesError{
+			UnresolvedTemplateVariables: unresolvedTemplates,
+			EntityType:                  "service spec",
+			AvailableTemplateVariables:  GetTemplateVariables(templates...),
+		}
 	}
 
 	err = yaml.Unmarshal([]byte(replacedMarshalledSpec), &service)
@@ -133,7 +153,11 @@ func ReplaceTemplateVariablesInIngressSpec(
 	unresolvedTemplates := GetUnresolvedTemplatesFromString(replacedMarshalledSpec)
 
 	if len(unresolvedTemplates) > 0 {
-		return spec, errors.UnresolvedTemplatesError{TemplateVariables: unresolvedTemplates, EntityType: "ingress spec"}
+		return spec, errors.UnresolvedTemplatesError{
+			UnresolvedTemplateVariables: unresolvedTemplates,
+			EntityType:                  "ingress spec",
+			AvailableTemplateVariables:  GetTemplateVariables(templates...),
+		}
 	}
 
 	err = yaml.Unmarshal([]byte(replacedMarshalledSpec), &ingress)
