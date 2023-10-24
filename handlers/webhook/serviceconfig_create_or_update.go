@@ -9,7 +9,6 @@ import (
 	"github.com/szeber/kube-stager/handlers/template"
 	"github.com/szeber/kube-stager/helpers"
 	errorshelpers "github.com/szeber/kube-stager/helpers/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,6 +33,11 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 
 	if err := template.LoadServiceConfigs(&templateHandler, ctx, r.Client); nil != err {
 		logger.Error(err, "Failed to load the service configs for the site")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	if err := template.LoadConfigs(&templateHandler, ctx, r.Client); nil != err {
+		logger.Error(err, "Failed to load the database configs for the site")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
@@ -66,50 +70,23 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 
 	if "" != config.Spec.DefaultMongoEnvironment {
 		logger.Info("Validating default mongo environment: " + config.Spec.DefaultMongoEnvironment)
-		mongoConfig := configv1.MongoConfig{}
-		err := r.Client.Get(
-			ctx,
-			client.ObjectKey{Namespace: config.Namespace, Name: config.Spec.DefaultMongoEnvironment},
-			&mongoConfig,
-		)
-		if apierrors.IsNotFound(err) {
+		if _, ok := templateHandler.GetMongo()[config.Spec.DefaultMongoEnvironment]; !ok {
 			return admission.Denied("Invalid mongo environment: " + config.Spec.DefaultMongoEnvironment)
-		} else if nil != err {
-			return admission.Errored(http.StatusInternalServerError, err)
 		}
-		templateHandler.SetMongo(mongoConfig)
 	}
 
 	if "" != config.Spec.DefaultMysqlEnvironment {
 		logger.Info("Validating default mysql environment: " + config.Spec.DefaultMysqlEnvironment)
-		mysqlConfig := configv1.MysqlConfig{}
-		err := r.Client.Get(
-			ctx,
-			client.ObjectKey{Namespace: config.Namespace, Name: config.Spec.DefaultMysqlEnvironment},
-			&mysqlConfig,
-		)
-		if apierrors.IsNotFound(err) {
+		if _, ok := templateHandler.GetMongo()[config.Spec.DefaultMysqlEnvironment]; !ok {
 			return admission.Denied("Invalid mysql environment: " + config.Spec.DefaultMysqlEnvironment)
-		} else if nil != err {
-			return admission.Errored(http.StatusInternalServerError, err)
 		}
-		templateHandler.SetMysql(mysqlConfig)
 	}
 
 	if "" != config.Spec.DefaultRedisEnvironment {
 		logger.Info("Validating default redis environment: " + config.Spec.DefaultRedisEnvironment)
-		redisConfig := configv1.RedisConfig{}
-		err := r.Client.Get(
-			ctx,
-			client.ObjectKey{Namespace: config.Namespace, Name: config.Spec.DefaultRedisEnvironment},
-			&redisConfig,
-		)
-		if apierrors.IsNotFound(err) {
+		if _, ok := templateHandler.GetMongo()[config.Spec.DefaultRedisEnvironment]; !ok {
 			return admission.Denied("Invalid redis environment: " + config.Spec.DefaultRedisEnvironment)
-		} else if nil != err {
-			return admission.Errored(http.StatusInternalServerError, err)
 		}
-		templateHandler.SetRedis(redisConfig)
 	}
 
 	logger.Info("Validating templates")
