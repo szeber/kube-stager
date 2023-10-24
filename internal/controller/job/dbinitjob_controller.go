@@ -225,7 +225,7 @@ func (r *DbInitJobReconciler) createJobIfNeeded(job *jobv1.DbInitJob, ctx contex
 	}
 
 	logger.V(0).Info("Creating job")
-	batchJob, err := r.createJob(ctx, job, serviceConfig, mysqlConfig, mongoConfig)
+	batchJob, err := r.createJob(ctx, job, serviceConfig)
 	if nil != err {
 		return false, err
 	}
@@ -285,13 +285,7 @@ func (r *DbInitJobReconciler) getServiceConfig(
 	return &config, nil
 }
 
-func (r *DbInitJobReconciler) createJob(
-	ctx context.Context,
-	job *jobv1.DbInitJob,
-	serviceConfig *configv1.ServiceConfig,
-	mysqlConfig *configv1.MysqlConfig,
-	mongoConfig *configv1.MongoConfig,
-) (*batchv1.Job, error) {
+func (r *DbInitJobReconciler) createJob(ctx context.Context, job *jobv1.DbInitJob, serviceConfig *configv1.ServiceConfig) (*batchv1.Job, error) {
 	if nil == serviceConfig.Spec.DbInitPodSpec {
 		return nil, errors.New("no db init pod spec specified in the service config")
 	}
@@ -312,11 +306,8 @@ func (r *DbInitJobReconciler) createJob(
 		labels.Service: job.Spec.ServiceName,
 	}
 	templateHandler := template.NewSite(site, *serviceConfig)
-	if nil != mysqlConfig {
-		templateHandler.SetMysql(*mysqlConfig)
-	}
-	if nil != mongoConfig {
-		templateHandler.SetMongo(*mongoConfig)
+	if err := template.LoadConfigs(&templateHandler, ctx, r.Client); nil != err {
+		return nil, err
 	}
 
 	podSpec, err := helpers.ReplaceTemplateVariablesInPodSpec(*serviceConfig.Spec.DbInitPodSpec, &templateHandler)

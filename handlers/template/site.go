@@ -166,32 +166,25 @@ func (r *SiteTemplateHandler) getNamespace() string {
 
 func (r *SiteTemplateHandler) GetTemplateValues() map[string]string {
 	result := map[string]string{
-		"site.name":               r.site.Name,
-		"site.domainPrefix":       r.site.Spec.DomainPrefix,
-		"site.imageTag":           r.siteServiceSpec.ImageTag,
-		"database.username":       r.siteServiceStatus.Username,
-		"database.name":           r.siteServiceStatus.DbName,
-		"database.password":       r.site.Spec.Password,
-		"database.redis.database": fmt.Sprintf("%d", r.siteServiceStatus.RedisDatabaseNumber),
-		"database.initSource":     r.siteServiceSpec.DbInitSourceEnvironmentName,
+		"site.name":         r.site.Name,
+		"site.domainPrefix": r.site.Spec.DomainPrefix,
+		"site.imageTag":     r.siteServiceSpec.ImageTag,
 	}
 
-	if "" != r.siteServiceSpec.MysqlEnvironment {
-		for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs[r.siteServiceSpec.MysqlEnvironment]) {
-			result[k] = v
-		}
+	for k, v := range r.getCommonDatabaseConfigTemplateValues(r.siteServiceStatus, r.siteServiceSpec) {
+		result[k] = v
 	}
 
-	if "" != r.siteServiceSpec.MongoEnvironment {
-		for k, v := range r.getMongoConfigTemplateValues(r.mongoConfigs[r.siteServiceSpec.MongoEnvironment]) {
-			result[k] = v
-		}
+	for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs, r.siteServiceSpec.MysqlEnvironment, r.currentServiceConfig.Spec.DefaultMysqlEnvironment) {
+		result[k] = v
 	}
 
-	if "" != r.siteServiceSpec.RedisEnvironment {
-		for k, v := range r.getRedisConfigTemplateValues(r.redisConfigs[r.siteServiceSpec.RedisEnvironment]) {
-			result[k] = v
-		}
+	for k, v := range r.getMongoConfigTemplateValues(r.mongoConfigs, r.siteServiceSpec.MongoEnvironment, r.currentServiceConfig.Spec.DefaultMongoEnvironment) {
+		result[k] = v
+	}
+
+	for k, v := range r.getRedisConfigTemplateValues(r.redisConfigs, r.siteServiceSpec.RedisEnvironment, r.currentServiceConfig.Spec.DefaultRedisEnvironment) {
+		result[k] = v
 	}
 
 	for name := range r.currentServiceConfig.Spec.ConfigMaps {
@@ -208,38 +201,69 @@ func (r *SiteTemplateHandler) GetTemplateValues() map[string]string {
 
 	for name, config := range r.serviceConfigs {
 		result["service."+name+".clusterUrl"] = api.MakeServiceUrl(&r.site, config.Spec.ShortName)
-		if "" != r.site.Spec.Services[name].MysqlEnvironment {
-			for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs[r.site.Spec.Services[name].MysqlEnvironment]) {
-				result[fmt.Sprintf("service.%s.%s", name, k)] = v
-			}
+
+		for k, v := range r.getCommonDatabaseConfigTemplateValues(r.site.Status.Services[name], r.site.Spec.Services[name]) {
+			result[fmt.Sprintf("service.%s.%s", name, k)] = v
 		}
-		if "" != r.site.Spec.Services[name].MongoEnvironment {
-			for k, v := range r.getMongoConfigTemplateValues(r.mongoConfigs[r.site.Spec.Services[name].MongoEnvironment]) {
-				result[fmt.Sprintf("service.%s.%s", name, k)] = v
-			}
+
+		for k, v := range r.getMysqlConfigTemplateValues(r.mysqlConfigs, r.site.Spec.Services[name].MysqlEnvironment, config.Spec.DefaultMysqlEnvironment) {
+			result[fmt.Sprintf("service.%s.%s", name, k)] = v
 		}
-		if "" != r.site.Spec.Services[name].RedisEnvironment {
-			for k, v := range r.getRedisConfigTemplateValues(r.redisConfigs[r.site.Spec.Services[name].RedisEnvironment]) {
-				result[fmt.Sprintf("service.%s.%s", name, k)] = v
-			}
+		for k, v := range r.getMongoConfigTemplateValues(r.mongoConfigs, r.site.Spec.Services[name].MongoEnvironment, config.Spec.DefaultMongoEnvironment) {
+			result[fmt.Sprintf("service.%s.%s", name, k)] = v
+		}
+		for k, v := range r.getRedisConfigTemplateValues(r.redisConfigs, r.site.Spec.Services[name].RedisEnvironment, config.Spec.DefaultRedisEnvironment) {
+			result[fmt.Sprintf("service.%s.%s", name, k)] = v
 		}
 	}
 
 	return result
 }
 
-func (r *SiteTemplateHandler) getMysqlConfigTemplateValues(mysqlConfig configv1.MysqlConfig) map[string]string {
+func (r *SiteTemplateHandler) getMysqlConfigTemplateValues(
+	mysqlConfigs map[string]configv1.MysqlConfig,
+	siteEnvironmentName string,
+	serviceDefaultEnvironmentName string,
+) map[string]string {
 	result := make(map[string]string)
+	var configName string
 
+	if "" == siteEnvironmentName {
+		if "" == serviceDefaultEnvironmentName {
+			return result
+		} else {
+			configName = serviceDefaultEnvironmentName
+		}
+	} else {
+		configName = siteEnvironmentName
+	}
+
+	mysqlConfig := mysqlConfigs[configName]
 	result["database.mysql.host"] = mysqlConfig.Spec.Host
 	result["database.mysql.port"] = fmt.Sprintf("%d", mysqlConfig.Spec.Port)
 
 	return result
 }
 
-func (r *SiteTemplateHandler) getMongoConfigTemplateValues(mongoConfig configv1.MongoConfig) map[string]string {
+func (r *SiteTemplateHandler) getMongoConfigTemplateValues(
+	mongoConfigs map[string]configv1.MongoConfig,
+	siteEnvironmentName string,
+	serviceDefaultEnvironmentName string,
+) map[string]string {
 	result := make(map[string]string)
+	var configName string
 
+	if "" == siteEnvironmentName {
+		if "" == serviceDefaultEnvironmentName {
+			return result
+		} else {
+			configName = serviceDefaultEnvironmentName
+		}
+	} else {
+		configName = siteEnvironmentName
+	}
+
+	mongoConfig := mongoConfigs[configName]
 	result["database.mongo.host1"] = mongoConfig.Spec.Host1
 	result["database.mongo.host2"] = mongoConfig.Spec.Host2
 	result["database.mongo.host3"] = mongoConfig.Spec.Host3
@@ -248,9 +272,25 @@ func (r *SiteTemplateHandler) getMongoConfigTemplateValues(mongoConfig configv1.
 	return result
 }
 
-func (r *SiteTemplateHandler) getRedisConfigTemplateValues(redisConfig configv1.RedisConfig) map[string]string {
+func (r *SiteTemplateHandler) getRedisConfigTemplateValues(
+	redisConfigs map[string]configv1.RedisConfig,
+	siteEnvironmentName string,
+	serviceDefaultEnvironmentName string,
+) map[string]string {
 	result := make(map[string]string)
+	var configName string
 
+	if "" == siteEnvironmentName {
+		if "" == serviceDefaultEnvironmentName {
+			return result
+		} else {
+			configName = serviceDefaultEnvironmentName
+		}
+	} else {
+		configName = siteEnvironmentName
+	}
+
+	redisConfig := redisConfigs[configName]
 	scheme := "tcp"
 	if nil != redisConfig.Spec.IsTlsEnabled && *redisConfig.Spec.IsTlsEnabled {
 		scheme = "tls"
@@ -259,6 +299,18 @@ func (r *SiteTemplateHandler) getRedisConfigTemplateValues(redisConfig configv1.
 	result["database.redis.host"] = redisConfig.Spec.Host
 	result["database.redis.port"] = fmt.Sprintf("%d", redisConfig.Spec.Port)
 	result["database.redis.password"] = redisConfig.Spec.Password
+
+	return result
+}
+
+func (r *SiteTemplateHandler) getCommonDatabaseConfigTemplateValues(serviceStatus sitev1.StagingSiteServiceStatus, serviceSpec sitev1.StagingSiteService) map[string]string {
+	result := map[string]string{
+		"database.username":       serviceStatus.Username,
+		"database.name":           serviceStatus.DbName,
+		"database.password":       r.site.Spec.Password,
+		"database.redis.database": fmt.Sprintf("%d", serviceStatus.RedisDatabaseNumber),
+		"database.initSource":     serviceSpec.DbInitSourceEnvironmentName,
+	}
 
 	return result
 }
