@@ -77,14 +77,14 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 
 	if "" != config.Spec.DefaultMysqlEnvironment {
 		logger.Info("Validating default mysql environment: " + config.Spec.DefaultMysqlEnvironment)
-		if _, ok := templateHandler.GetMongo()[config.Spec.DefaultMysqlEnvironment]; !ok {
+		if _, ok := templateHandler.GetMysql()[config.Spec.DefaultMysqlEnvironment]; !ok {
 			return admission.Denied("Invalid mysql environment: " + config.Spec.DefaultMysqlEnvironment)
 		}
 	}
 
 	if "" != config.Spec.DefaultRedisEnvironment {
 		logger.Info("Validating default redis environment: " + config.Spec.DefaultRedisEnvironment)
-		if _, ok := templateHandler.GetMongo()[config.Spec.DefaultRedisEnvironment]; !ok {
+		if _, ok := templateHandler.GetRedis()[config.Spec.DefaultRedisEnvironment]; !ok {
 			return admission.Denied("Invalid redis environment: " + config.Spec.DefaultRedisEnvironment)
 		}
 	}
