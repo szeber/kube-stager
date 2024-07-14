@@ -18,6 +18,10 @@ func ReconcileRedis(database *taskv1.RedisDatabase, config configv1.RedisConfig,
 
 	if config.Spec.IsTlsEnabled != nil && *config.Spec.IsTlsEnabled {
 		tlsConfig = &tls.Config{}
+		if config.Spec.VerifyTlsServerCertificate != nil && !*config.Spec.VerifyTlsServerCertificate {
+			logger.Info("Disabling TLS server certificate verification")
+			tlsConfig.InsecureSkipVerify = true
+		}
 	}
 
 	logger.Info(fmt.Sprintf("Flushing redis database %d on connection %s", database.Spec.DatabaseNumber, config.Name))

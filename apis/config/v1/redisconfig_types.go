@@ -39,8 +39,14 @@ type RedisConfigSpec struct {
 	//+optional
 	Port uint16 `json:"port,omitempty"`
 
+	//+kubebuilder:default:=false
 	// Whether TLS is enabled on the server
 	IsTlsEnabled *bool `json:"isTlsEnabled,omitempty"`
+
+	// Whether to verify the server's certificate
+	//+optional
+	//+kubebuilder:default:=true
+	VerifyTlsServerCertificate *bool `json:"verifyTlsServerCertificate,omitempty"`
 
 	// The password to connect to the server
 	//+optional
