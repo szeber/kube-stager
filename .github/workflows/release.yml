@@ -15,7 +15,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  IMAGE_TAG: test
+  IMAGE_TAG: ${{ github.ref_name }}
 
 jobs:
   build:
@@ -42,7 +42,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Release
-      run: make docker-buildx VERSION=$GITHUB_REF_NAME
+      run: make docker-buildx VERSION=$IMAGE_TAG
 
     - name: List image
       run: |
