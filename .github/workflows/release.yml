@@ -3,10 +3,10 @@ name: Release pipeline
 on:
   release:
     types: [ published ]
+  push:
+    branches: [ main ]
   pull_request:
-    types:
-      - opened
-  workflow_dispatch:
+    branches: [ main ]
 
 permissions:
   contents: read
