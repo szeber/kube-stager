@@ -2,7 +2,6 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
@@ -15,27 +14,6 @@ webhooks:
       path: /mutate-site-operator-kube-stager-io-v1-stagingsite
   failurePolicy: Fail
   name: mstagingsite.kb.io
-  rules:
-  - apiGroups:
-    - site.operator.kube-stager.io
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - stagingsites
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-site-operator-kube-stager-io-v1-stagingsite-advanced
-  failurePolicy: Fail
-  name: stagingsite-handler.operator.kube-stager.io
   rules:
   - apiGroups:
     - site.operator.kube-stager.io
@@ -68,13 +46,6 @@ webhooks:
     resources:
     - backups
   sideEffects: None
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-metadata:
-  creationTimestamp: null
-  name: validating-webhook-configuration
-webhooks:
 - admissionReviewVersions:
   - v1
   - v1beta1
@@ -82,40 +53,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-config-operator-kube-stager-io-v1-serviceconfig
+      path: /mutate-site-operator-kube-stager-io-v1-stagingsite-advanced
   failurePolicy: Fail
-  name: serviceconfig-handler.operator.kube-stager.io
+  name: stagingsite-handler.operator.kube-stager.io
   rules:
   - apiGroups:
-    - config.operator.kube-stager.io
+    - site.operator.kube-stager.io
     apiVersions:
     - v1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - serviceconfigs
+    - stagingsites
   sideEffects: None
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-config-operator-kube-stager-io-v1-serviceconfig-deletion
-  failurePolicy: Fail
-  name: serviceconfig-delete-handler.operator.kube-stager.io
-  rules:
-  - apiGroups:
-    - config.operator.kube-stager.io
-    apiVersions:
-    - v1
-    operations:
-    - DELETE
-    resources:
-    - serviceconfigs
-  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
 - admissionReviewVersions:
   - v1
   - v1beta1
@@ -175,4 +132,45 @@ webhooks:
     - DELETE
     resources:
     - redisconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-config-operator-kube-stager-io-v1-serviceconfig-deletion
+  failurePolicy: Fail
+  name: serviceconfig-delete-handler.operator.kube-stager.io
+  rules:
+  - apiGroups:
+    - config.operator.kube-stager.io
+    apiVersions:
+    - v1
+    operations:
+    - DELETE
+    resources:
+    - serviceconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-config-operator-kube-stager-io-v1-serviceconfig
+  failurePolicy: Fail
+  name: serviceconfig-handler.operator.kube-stager.io
+  rules:
+  - apiGroups:
+    - config.operator.kube-stager.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceconfigs
   sideEffects: None
