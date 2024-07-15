@@ -1,4 +1,4 @@
-name: Release pipeline
+name: Test version release pipeline
 
 on:
   release:
