@@ -22,7 +22,10 @@ import (
 	"os"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/yaml"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -101,20 +104,45 @@ func main() {
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		LeaderElectionID:       "ec56737d.operator.kube-stager.io",
-		Port:                   9443,
-		MetricsBindAddress:     ":8080",
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
+		Metrics:                server.Options{BindAddress: ":8080"},
 		HealthProbeBindAddress: ":8081",
 		LeaderElection:         false,
 	}
+
+	// Load configuration from file if specified
 	if configFile != "" {
-		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&ctrlConfig))
+		setupLog.Info("Loading configuration from file", "configFile", configFile)
+		configData, err := os.ReadFile(configFile)
 		if err != nil {
-			setupLog.Error(err, "unable to load the config file")
+			setupLog.Error(err, "unable to read config file")
 			os.Exit(1)
 		}
+
+		if err = yaml.Unmarshal(configData, &ctrlConfig); err != nil {
+			setupLog.Error(err, "unable to parse config file")
+			os.Exit(1)
+		}
+
+		// Apply config to options
+		if ctrlConfig.Health.HealthProbeBindAddress != "" {
+			options.HealthProbeBindAddress = ctrlConfig.Health.HealthProbeBindAddress
+		}
+		if ctrlConfig.Metrics.BindAddress != "" {
+			options.Metrics.BindAddress = ctrlConfig.Metrics.BindAddress
+		}
+		if ctrlConfig.Webhook.Port != 0 {
+			options.WebhookServer = webhook.NewServer(webhook.Options{Port: ctrlConfig.Webhook.Port})
+		}
+		if ctrlConfig.CacheNamespace != "" {
+			options.Cache.DefaultNamespaces = map[string]cache.Config{
+				ctrlConfig.CacheNamespace: {},
+			}
+		}
+		options.LeaderElection = ctrlConfig.LeaderElection
 	}
 
-	setupLog.Info("Finished loading config", "config", ctrlConfig)
+	setupLog.Info("Using config", "config", ctrlConfig)
 
 	if "" != ctrlConfig.SentryDsn {
 		err := sentry.Init(

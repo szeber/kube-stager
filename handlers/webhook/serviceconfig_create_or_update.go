@@ -17,7 +17,7 @@ import (
 
 type ServiceConfigCreateOrUpdateHandler struct {
 	Client  client.Client
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -151,7 +151,7 @@ func (r *ServiceConfigCreateOrUpdateHandler) validateTemplates(
 	return nil
 }
 
-func (r *ServiceConfigCreateOrUpdateHandler) InjectDecoder(d *admission.Decoder) error {
+func (r *ServiceConfigCreateOrUpdateHandler) InjectDecoder(d admission.Decoder) error {
 	r.decoder = d
 	return nil
 }

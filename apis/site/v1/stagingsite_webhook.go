@@ -17,14 +17,16 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/szeber/kube-stager/helpers"
-	"github.com/szeber/kube-stager/helpers/annotations"
-	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"context"
 	"time"
 
 	"github.com/sethvargo/go-password/password"
+	"github.com/szeber/kube-stager/helpers"
+	"github.com/szeber/kube-stager/helpers/annotations"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -33,6 +35,7 @@ var stagingsitelog = logf.Log.WithName("stagingsite-resource")
 func (r *StagingSite) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithDefaulter(&StagingSiteDefaulter{}).
 		Complete()
 }
 
@@ -40,10 +43,18 @@ func (r *StagingSite) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 //+kubebuilder:webhook:path=/mutate-site-operator-kube-stager-io-v1-stagingsite,mutating=true,failurePolicy=fail,sideEffects=None,groups=site.operator.kube-stager.io,resources=stagingsites,verbs=create;update,versions=v1,name=mstagingsite.kb.io,admissionReviewVersions={v1,v1beta1}
 
-var _ webhook.Defaulter = &StagingSite{}
+// StagingSiteDefaulter implements admission.CustomDefaulter for StagingSite
+type StagingSiteDefaulter struct{}
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *StagingSite) Default() {
+var _ admission.CustomDefaulter = &StagingSiteDefaulter{}
+
+// Default implements admission.CustomDefaulter so a webhook will be registered for the type
+func (d *StagingSiteDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+	r, ok := obj.(*StagingSite)
+	if !ok {
+		return nil
+	}
+
 	stagingsitelog.Info("default", "name", r.Name)
 
 	if 0 == len(r.ObjectMeta.Annotations) {
@@ -90,4 +101,6 @@ func (r *StagingSite) Default() {
 			Minutes: 0,
 		}
 	}
+
+	return nil
 }
