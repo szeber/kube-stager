@@ -18,7 +18,7 @@ import (
 type BackupCreateOrUpdateHandler struct {
 	Client  client.Client
 	Scheme  *runtime.Scheme
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -67,7 +67,7 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 	return admission.Allowed("")
 }
 
-func (r *BackupCreateOrUpdateHandler) InjectDecoder(d *admission.Decoder) error {
+func (r *BackupCreateOrUpdateHandler) InjectDecoder(d admission.Decoder) error {
 	r.decoder = d
 	return nil
 }

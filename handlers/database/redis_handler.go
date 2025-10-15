@@ -33,6 +33,7 @@ func ReconcileRedis(database *taskv1.RedisDatabase, config configv1.RedisConfig,
 			TLSConfig: tlsConfig,
 		},
 	)
+	defer client.Close()
 
 	foo := client.FlushDB()
 

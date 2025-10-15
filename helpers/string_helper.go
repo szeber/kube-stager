@@ -1,7 +1,7 @@
 package helpers
 
 import (
-	"github.com/grokify/gotilla/encoding/base36"
+	"github.com/grokify/mogo/encoding/base36"
 	"regexp"
 	"strings"
 )

@@ -204,7 +204,7 @@ func (r *mysqlReconcileTask) removeUser() error {
 }
 
 func (r *mysqlReconcileTask) reconcileDatabase() error {
-	_, err := r.connection.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", r.database))
+	_, err := r.connection.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", r.database))
 
 	return err
 }
@@ -218,7 +218,7 @@ func (r *mysqlReconcileTask) reconcilePermissions() error {
 
 	if !havePerms {
 		r.logger.Info("Granting all privileges on db " + r.database)
-		_, err = r.connection.Exec(fmt.Sprintf("GRANT ALL ON %s.* TO '%s'@'%%'", r.database, r.username))
+		_, err = r.connection.Exec(fmt.Sprintf("GRANT ALL ON `%s`.* TO '%s'@'%%'", r.database, r.username))
 
 		if err != nil {
 			panic(err)
@@ -259,7 +259,7 @@ func (r *mysqlReconcileTask) revokePermissionOnDatabase(dbName string) error {
 	}
 
 	r.logger.Info("Revoking all privileges on db " + dbName)
-	_, err := r.connection.Exec(fmt.Sprintf("REVOKE ALL ON %s.* FROM '%s'@'%%'", dbName, r.username))
+	_, err := r.connection.Exec(fmt.Sprintf("REVOKE ALL ON `%s`.* FROM '%s'@'%%'", dbName, r.username))
 
 	if err != nil {
 		return err
@@ -329,7 +329,7 @@ func (r *mysqlReconcileTask) changePassword() error {
 
 func (r *mysqlReconcileTask) removeDatabase() error {
 	r.logger.Info("Dropping database if it exists")
-	_, err := r.connection.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", r.database))
+	_, err := r.connection.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", r.database))
 
 	return err
 }

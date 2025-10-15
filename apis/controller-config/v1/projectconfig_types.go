@@ -18,7 +18,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cfg "sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -31,9 +30,25 @@ type ProjectConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// ControllerManagerConfigurationSpec returns the contfigurations for controllers
+	// Health contains the controller health configuration.
 	//+optional
-	cfg.ControllerManagerConfigurationSpec `json:",inline"`
+	Health HealthConfig `json:"health,omitempty"`
+
+	// Metrics contains the controller metrics configuration.
+	//+optional
+	Metrics MetricsConfig `json:"metrics,omitempty"`
+
+	// Webhook contains the controller webhook configuration.
+	//+optional
+	Webhook WebhookConfig `json:"webhook,omitempty"`
+
+	// LeaderElection determines whether to use leader election when starting the manager.
+	//+optional
+	LeaderElection bool `json:"leaderElection,omitempty"`
+
+	// CacheNamespace if specified restricts the manager's cache to watch objects in the desired namespace.
+	//+optional
+	CacheNamespace string `json:"cacheNamespace,omitempty"`
 
 	// The DSN for Sentry if sentry is used to capture errors
 	//+optional
@@ -51,6 +66,29 @@ type ProjectConfig struct {
 	// The config for the init job
 	//+optional
 	BackupJobConfig JobConfig `json:"backupJobConfig,omitempty"`
+}
+
+// HealthConfig contains the controller health configuration.
+type HealthConfig struct {
+	// HealthProbeBindAddress is the TCP address that the controller should bind to
+	// for serving health probes
+	//+optional
+	HealthProbeBindAddress string `json:"healthProbeBindAddress,omitempty"`
+}
+
+// MetricsConfig contains the controller metrics configuration.
+type MetricsConfig struct {
+	// BindAddress is the TCP address that the controller should bind to
+	// for serving prometheus metrics
+	//+optional
+	BindAddress string `json:"bindAddress,omitempty"`
+}
+
+// WebhookConfig contains the controller webhook configuration.
+type WebhookConfig struct {
+	// Port is the port that the webhook server serves at.
+	//+optional
+	Port int `json:"port,omitempty"`
 }
 
 type JobConfig struct {

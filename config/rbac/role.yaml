@@ -8,17 +8,6 @@ rules:
   - ""
   resources:
   - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - services
   verbs:
   - create
@@ -55,21 +44,7 @@ rules:
   - config.operator.kube-stager.io
   resources:
   - mongoconfigs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - config.operator.kube-stager.io
-  resources:
   - mysqlconfigs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - config.operator.kube-stager.io
-  resources:
   - redisconfigs
   verbs:
   - get
@@ -89,57 +64,7 @@ rules:
   - job.operator.kube-stager.io
   resources:
   - backups
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - job.operator.kube-stager.io
-  resources:
-  - backups/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - job.operator.kube-stager.io
-  resources:
-  - backups/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - job.operator.kube-stager.io
-  resources:
   - dbinitjobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - job.operator.kube-stager.io
-  resources:
-  - dbinitjobs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - job.operator.kube-stager.io
-  resources:
-  - dbinitjobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - job.operator.kube-stager.io
-  resources:
   - dbmigrationjobs
   verbs:
   - create
@@ -152,12 +77,16 @@ rules:
 - apiGroups:
   - job.operator.kube-stager.io
   resources:
+  - backups/finalizers
+  - dbinitjobs/finalizers
   - dbmigrationjobs/finalizers
   verbs:
   - update
 - apiGroups:
   - job.operator.kube-stager.io
   resources:
+  - backups/status
+  - dbinitjobs/status
   - dbmigrationjobs/status
   verbs:
   - get
@@ -205,57 +134,7 @@ rules:
   - task.operator.kube-stager.io
   resources:
   - mongodatabases
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - task.operator.kube-stager.io
-  resources:
-  - mongodatabases/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - task.operator.kube-stager.io
-  resources:
-  - mongodatabases/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - task.operator.kube-stager.io
-  resources:
   - mysqldatabases
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - task.operator.kube-stager.io
-  resources:
-  - mysqldatabases/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - task.operator.kube-stager.io
-  resources:
-  - mysqldatabases/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - task.operator.kube-stager.io
-  resources:
   - redisdatabases
   verbs:
   - create
@@ -268,12 +147,16 @@ rules:
 - apiGroups:
   - task.operator.kube-stager.io
   resources:
+  - mongodatabases/finalizers
+  - mysqldatabases/finalizers
   - redisdatabases/finalizers
   verbs:
   - update
 - apiGroups:
   - task.operator.kube-stager.io
   resources:
+  - mongodatabases/status
+  - mysqldatabases/status
   - redisdatabases/status
   verbs:
   - get

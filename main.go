@@ -18,11 +18,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/getsentry/sentry-go"
 	"os"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/yaml"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -64,6 +68,46 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+func validateConfig(config *controllerconfigv1.ProjectConfig) error {
+	// Validate webhook port
+	if config.Webhook.Port < 0 || config.Webhook.Port > 65535 {
+		return fmt.Errorf("invalid webhook port: %d (must be between 0 and 65535)", config.Webhook.Port)
+	}
+
+	// Validate job config deadlines and TTLs
+	if config.InitJobConfig.DeadlineSeconds < 0 {
+		return fmt.Errorf("invalid initJobConfig.deadlineSeconds: %d (must be >= 0)", config.InitJobConfig.DeadlineSeconds)
+	}
+	if config.InitJobConfig.TtlSeconds < 0 {
+		return fmt.Errorf("invalid initJobConfig.ttlSeconds: %d (must be >= 0)", config.InitJobConfig.TtlSeconds)
+	}
+	if config.InitJobConfig.BackoffLimit < 0 {
+		return fmt.Errorf("invalid initJobConfig.backoffLimit: %d (must be >= 0)", config.InitJobConfig.BackoffLimit)
+	}
+
+	if config.MigrationJobConfig.DeadlineSeconds < 0 {
+		return fmt.Errorf("invalid migrationJobConfig.deadlineSeconds: %d (must be >= 0)", config.MigrationJobConfig.DeadlineSeconds)
+	}
+	if config.MigrationJobConfig.TtlSeconds < 0 {
+		return fmt.Errorf("invalid migrationJobConfig.ttlSeconds: %d (must be >= 0)", config.MigrationJobConfig.TtlSeconds)
+	}
+	if config.MigrationJobConfig.BackoffLimit < 0 {
+		return fmt.Errorf("invalid migrationJobConfig.backoffLimit: %d (must be >= 0)", config.MigrationJobConfig.BackoffLimit)
+	}
+
+	if config.BackupJobConfig.DeadlineSeconds < 0 {
+		return fmt.Errorf("invalid backupJobConfig.deadlineSeconds: %d (must be >= 0)", config.BackupJobConfig.DeadlineSeconds)
+	}
+	if config.BackupJobConfig.TtlSeconds < 0 {
+		return fmt.Errorf("invalid backupJobConfig.ttlSeconds: %d (must be >= 0)", config.BackupJobConfig.TtlSeconds)
+	}
+	if config.BackupJobConfig.BackoffLimit < 0 {
+		return fmt.Errorf("invalid backupJobConfig.backoffLimit: %d (must be >= 0)", config.BackupJobConfig.BackoffLimit)
+	}
+
+	return nil
+}
+
 func main() {
 	var configFile string
 	flag.StringVar(
@@ -101,23 +145,54 @@ func main() {
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		LeaderElectionID:       "ec56737d.operator.kube-stager.io",
-		Port:                   9443,
-		MetricsBindAddress:     ":8080",
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
+		Metrics:                server.Options{BindAddress: ":8080"},
 		HealthProbeBindAddress: ":8081",
 		LeaderElection:         false,
 	}
+
+	// Load configuration from file if specified
 	if configFile != "" {
-		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile).OfKind(&ctrlConfig))
+		setupLog.Info("Loading configuration from file", "configFile", configFile)
+		configData, err := os.ReadFile(configFile)
 		if err != nil {
-			setupLog.Error(err, "unable to load the config file")
+			setupLog.Error(err, "unable to read config file")
 			os.Exit(1)
 		}
+
+		if err = yaml.Unmarshal(configData, &ctrlConfig); err != nil {
+			setupLog.Error(err, "unable to parse config file")
+			os.Exit(1)
+		}
+
+		// Validate config
+		if err = validateConfig(&ctrlConfig); err != nil {
+			setupLog.Error(err, "invalid configuration")
+			os.Exit(1)
+		}
+
+		// Apply config to options
+		if ctrlConfig.Health.HealthProbeBindAddress != "" {
+			options.HealthProbeBindAddress = ctrlConfig.Health.HealthProbeBindAddress
+		}
+		if ctrlConfig.Metrics.BindAddress != "" {
+			options.Metrics.BindAddress = ctrlConfig.Metrics.BindAddress
+		}
+		if ctrlConfig.Webhook.Port != 0 {
+			options.WebhookServer = webhook.NewServer(webhook.Options{Port: ctrlConfig.Webhook.Port})
+		}
+		if ctrlConfig.CacheNamespace != "" {
+			options.Cache.DefaultNamespaces = map[string]cache.Config{
+				ctrlConfig.CacheNamespace: {},
+			}
+		}
+		options.LeaderElection = ctrlConfig.LeaderElection
 	}
 
-	setupLog.Info("Finished loading config", "config", ctrlConfig)
+	setupLog.Info("Using config", "config", ctrlConfig)
 
 	if "" != ctrlConfig.SentryDsn {
-		err := sentry.Init(
+		err = sentry.Init(
 			sentry.ClientOptions{
 				Dsn: ctrlConfig.SentryDsn,
 			},

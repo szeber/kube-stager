@@ -17,7 +17,7 @@ import (
 
 type StagingsiteHandler struct {
 	Client  client.Client
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -180,7 +180,7 @@ func (r *StagingsiteHandler) updatePrefixedLabels(site *sitev1.StagingSite, pref
 	site.Labels = siteLabels
 }
 
-func (r *StagingsiteHandler) InjectDecoder(d *admission.Decoder) error {
+func (r *StagingsiteHandler) InjectDecoder(d admission.Decoder) error {
 	r.decoder = d
 	return nil
 }
