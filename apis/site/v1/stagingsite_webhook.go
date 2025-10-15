@@ -80,7 +80,10 @@ func (d *StagingSiteDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	}
 
 	if r.Spec.Password == "" {
-		randomPassword, _ := password.Generate(25, 6, 0, false, true)
+		randomPassword, err := password.Generate(25, 6, 0, false, true)
+		if err != nil {
+			return err
+		}
 		r.Spec.Password = helpers.SanitiseDbValue(randomPassword)
 	}
 

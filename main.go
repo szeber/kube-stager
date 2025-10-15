@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/getsentry/sentry-go"
 	"os"
 	"time"
@@ -65,6 +66,46 @@ func init() {
 	utilruntime.Must(sitev1.AddToScheme(scheme))
 	utilruntime.Must(controllerconfigv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+}
+
+func validateConfig(config *controllerconfigv1.ProjectConfig) error {
+	// Validate webhook port
+	if config.Webhook.Port < 0 || config.Webhook.Port > 65535 {
+		return fmt.Errorf("invalid webhook port: %d (must be between 0 and 65535)", config.Webhook.Port)
+	}
+
+	// Validate job config deadlines and TTLs
+	if config.InitJobConfig.DeadlineSeconds < 0 {
+		return fmt.Errorf("invalid initJobConfig.deadlineSeconds: %d (must be >= 0)", config.InitJobConfig.DeadlineSeconds)
+	}
+	if config.InitJobConfig.TtlSeconds < 0 {
+		return fmt.Errorf("invalid initJobConfig.ttlSeconds: %d (must be >= 0)", config.InitJobConfig.TtlSeconds)
+	}
+	if config.InitJobConfig.BackoffLimit < 0 {
+		return fmt.Errorf("invalid initJobConfig.backoffLimit: %d (must be >= 0)", config.InitJobConfig.BackoffLimit)
+	}
+
+	if config.MigrationJobConfig.DeadlineSeconds < 0 {
+		return fmt.Errorf("invalid migrationJobConfig.deadlineSeconds: %d (must be >= 0)", config.MigrationJobConfig.DeadlineSeconds)
+	}
+	if config.MigrationJobConfig.TtlSeconds < 0 {
+		return fmt.Errorf("invalid migrationJobConfig.ttlSeconds: %d (must be >= 0)", config.MigrationJobConfig.TtlSeconds)
+	}
+	if config.MigrationJobConfig.BackoffLimit < 0 {
+		return fmt.Errorf("invalid migrationJobConfig.backoffLimit: %d (must be >= 0)", config.MigrationJobConfig.BackoffLimit)
+	}
+
+	if config.BackupJobConfig.DeadlineSeconds < 0 {
+		return fmt.Errorf("invalid backupJobConfig.deadlineSeconds: %d (must be >= 0)", config.BackupJobConfig.DeadlineSeconds)
+	}
+	if config.BackupJobConfig.TtlSeconds < 0 {
+		return fmt.Errorf("invalid backupJobConfig.ttlSeconds: %d (must be >= 0)", config.BackupJobConfig.TtlSeconds)
+	}
+	if config.BackupJobConfig.BackoffLimit < 0 {
+		return fmt.Errorf("invalid backupJobConfig.backoffLimit: %d (must be >= 0)", config.BackupJobConfig.BackoffLimit)
+	}
+
+	return nil
 }
 
 func main() {
@@ -124,6 +165,12 @@ func main() {
 			os.Exit(1)
 		}
 
+		// Validate config
+		if err = validateConfig(&ctrlConfig); err != nil {
+			setupLog.Error(err, "invalid configuration")
+			os.Exit(1)
+		}
+
 		// Apply config to options
 		if ctrlConfig.Health.HealthProbeBindAddress != "" {
 			options.HealthProbeBindAddress = ctrlConfig.Health.HealthProbeBindAddress
@@ -145,7 +192,7 @@ func main() {
 	setupLog.Info("Using config", "config", ctrlConfig)
 
 	if "" != ctrlConfig.SentryDsn {
-		err := sentry.Init(
+		err = sentry.Init(
 			sentry.ClientOptions{
 				Dsn: ctrlConfig.SentryDsn,
 			},
