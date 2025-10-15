@@ -1,12 +1,41 @@
 # kube-stager
-// TODO(user): Add simple overview of use/purpose
+
+A Kubernetes operator for managing staging and test environments with automated database provisioning and lifecycle management.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+kube-stager is a Kubernetes operator that automates the creation and management of staging/test sites. It handles:
+- Automatic database provisioning (MySQL, MongoDB, Redis)
+- Database initialization and migration jobs
+- Backup creation and restoration
+- Resource lifecycle management
+- Service configuration and validation
+
+The operator is designed for teams that need to quickly spin up isolated test environments with their own databases and configurations.
+
+## Requirements
+
+- Kubernetes 1.29+ (for sidecar container support)
+- Go 1.23+ (for development)
+- Helm 3+ (for deployment)
 
 ## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+
+The recommended way to install kube-stager is via Helm chart. See [kube-stager-helm](https://github.com/szeber/kube-stager-helm) for installation instructions.
+
+### Configuration
+
+The operator supports configuration via a ConfigMap. Key settings include:
+
+- `leaderElection`: Enable/disable leader election (default: true for v1.0.0+)
+- `sentryDsn`: Optional Sentry DSN for error tracking
+- `initJobConfig`, `migrationJobConfig`, `backupJobConfig`: Job timeout and retry settings
+
+For Redis databases with TLS:
+- Set `isTlsEnabled: true` in RedisConfig
+- Optionally set `verifyTlsServerCertificate: false` for self-signed certificates
+
+All configuration values are validated at startup. Invalid configurations will cause the operator to exit with a descriptive error message.
 
 ### Running on the cluster
 1. Install Instances of Custom Resources:
@@ -76,9 +105,20 @@ make manifests
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
 
+## Monitoring
+
+Optional Prometheus integration is available via ServiceMonitor (requires Prometheus Operator):
+- Set `monitoring.enabled: true` in Helm values
+- Metrics exposed on port 8443 via kube-rbac-proxy
+- Default scrape interval: 30s
+
+## Version History
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
 ## License
 
-Copyright 2023.
+Copyright 2023-2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
