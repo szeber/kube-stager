@@ -12,10 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive functional test plan (FUNCTIONAL_TEST_PLAN_V1.0.0.md)
 
 ### Changed
-- **BREAKING**: Upgraded to Go 1.23
+- **BREAKING**: Upgraded to Go 1.24
 - **BREAKING**: Upgraded controller-runtime from v0.13.0 to v0.20.4
 - **BREAKING**: Upgraded Kubernetes APIs from v0.25.0 to v0.32.1
 - **BREAKING**: Upgraded kubebuilder from v4-alpha to v4
+- **BREAKING**: Redis handler now properly uses TLS and authentication. TLS certificate verification is enabled by default - set `verifyTlsServerCertificate: false` in RedisConfig for self-signed certificates
 - Replaced deprecated config/v1alpha1 with custom ProjectConfig implementation
 - Migrated webhook.Defaulter to admission.CustomDefaulter
 - Updated admission.Decoder from pointer to interface type
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **SECURITY**: SQL injection vulnerability in MySQL handler (added identifier quoting)
 - **SECURITY**: Redis client resource leak (added proper cleanup)
+- Webhook decoder injection for controller-runtime v0.20.4 (fixes nil pointer panics in stagingsite, serviceconfig, and backup webhooks)
 - Ignored error from password generation in webhook
 - Variable shadowing in main.go
 
