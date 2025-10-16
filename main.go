@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	"sigs.k8s.io/yaml"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -272,9 +273,19 @@ func main() {
 
 	setupLog.Info("registering advanced webhooks to the webhook server")
 
+	// Create decoder for webhooks that need it
+	decoder := admission.NewDecoder(scheme)
+
+	// Create handlers and inject decoder
+	serviceConfigHandler := &webhook2.ServiceConfigCreateOrUpdateHandler{Client: mgr.GetClient()}
+	if err := serviceConfigHandler.InjectDecoder(decoder); err != nil {
+		setupLog.Error(err, "unable to inject decoder into serviceconfig handler")
+		os.Exit(1)
+	}
+
 	mgr.GetWebhookServer().Register(
 		"/validate-config-operator-kube-stager-io-v1-serviceconfig",
-		&webhook.Admission{Handler: &webhook2.ServiceConfigCreateOrUpdateHandler{Client: mgr.GetClient()}},
+		&webhook.Admission{Handler: serviceConfigHandler},
 	)
 	mgr.GetWebhookServer().Register(
 		"/validate-config-operator-kube-stager-io-v1-serviceconfig-deletion",
@@ -292,18 +303,28 @@ func main() {
 		"/validate-config-operator-kube-stager-io-v1-redisconfig-deletion",
 		&webhook.Admission{Handler: &webhook2.RedisConfigDeleteHandler{Client: mgr.GetClient()}},
 	)
+	stagingsiteHandler := &webhook2.StagingsiteHandler{Client: mgr.GetClient()}
+	if err := stagingsiteHandler.InjectDecoder(decoder); err != nil {
+		setupLog.Error(err, "unable to inject decoder into stagingsite handler")
+		os.Exit(1)
+	}
+
 	mgr.GetWebhookServer().Register(
 		"/mutate-site-operator-kube-stager-io-v1-stagingsite-advanced",
-		&webhook.Admission{Handler: &webhook2.StagingsiteHandler{Client: mgr.GetClient()}},
+		&webhook.Admission{Handler: stagingsiteHandler},
 	)
+	backupHandler := &webhook2.BackupCreateOrUpdateHandler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+	if err := backupHandler.InjectDecoder(decoder); err != nil {
+		setupLog.Error(err, "unable to inject decoder into backup handler")
+		os.Exit(1)
+	}
+
 	mgr.GetWebhookServer().Register(
 		"/mutate-job-operator-kube-stager-io-v1-backup-advanced",
-		&webhook.Admission{
-			Handler: &webhook2.BackupCreateOrUpdateHandler{
-				Client: mgr.GetClient(),
-				Scheme: mgr.GetScheme(),
-			},
-		},
+		&webhook.Admission{Handler: backupHandler},
 	)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
