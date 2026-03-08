@@ -109,7 +109,7 @@ More information can be found via the [Kubebuilder Documentation](https://book.k
 
 Optional Prometheus integration is available via ServiceMonitor (requires Prometheus Operator):
 - Set `monitoring.enabled: true` in Helm values
-- Metrics exposed on port 8443 via kube-rbac-proxy
+- Metrics exposed on port 8080 over HTTP
 - Default scrape interval: 30s
 
 ## Version History
