@@ -17,7 +17,7 @@ import (
 
 type StagingsiteHandler struct {
 	Client  client.Client
-	decoder admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -25,7 +25,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 	site := &sitev1.StagingSite{}
 	var err error
 
-	if err = r.decoder.Decode(req, site); nil != err {
+	if err = r.Decoder.Decode(req, site); nil != err {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -178,9 +178,4 @@ func (r *StagingsiteHandler) updatePrefixedLabels(site *sitev1.StagingSite, pref
 		siteLabels[prefix+v] = "true"
 	}
 	site.Labels = siteLabels
-}
-
-func (r *StagingsiteHandler) InjectDecoder(d admission.Decoder) error {
-	r.decoder = d
-	return nil
 }

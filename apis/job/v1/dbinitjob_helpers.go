@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"errors"
 	"fmt"
 	api "github.com/szeber/kube-stager/apis"
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
@@ -19,7 +18,7 @@ func (r *DbInitJob) PopulateFomSite(
 ) error {
 	siteService, ok := site.Spec.Services[config.Name]
 	if !ok {
-		return errors.New(fmt.Sprintf("Service %s is not in the site spec", config.Name))
+		return fmt.Errorf("service %s is not in the site spec", config.Name)
 	}
 
 	r.ObjectMeta = metav1.ObjectMeta{

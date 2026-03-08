@@ -25,7 +25,10 @@ import (
 	"github.com/szeber/kube-stager/helpers/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
+
+var _ admission.Defaulter[*StagingSite] = &StagingSiteDefaulter{}
 
 // log is for logging in this package.
 var stagingsitelog = logf.Log.WithName("stagingsite-resource")

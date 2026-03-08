@@ -276,11 +276,10 @@ func main() {
 	// Create decoder for webhooks that need it
 	decoder := admission.NewDecoder(scheme)
 
-	// Create handlers and inject decoder
-	serviceConfigHandler := &webhook2.ServiceConfigCreateOrUpdateHandler{Client: mgr.GetClient()}
-	if err := serviceConfigHandler.InjectDecoder(decoder); err != nil {
-		setupLog.Error(err, "unable to inject decoder into serviceconfig handler")
-		os.Exit(1)
+	// Create handlers with decoder
+	serviceConfigHandler := &webhook2.ServiceConfigCreateOrUpdateHandler{
+		Client:  mgr.GetClient(),
+		Decoder: decoder,
 	}
 
 	mgr.GetWebhookServer().Register(
@@ -303,10 +302,9 @@ func main() {
 		"/validate-config-operator-kube-stager-io-v1-redisconfig-deletion",
 		&webhook.Admission{Handler: &webhook2.RedisConfigDeleteHandler{Client: mgr.GetClient()}},
 	)
-	stagingsiteHandler := &webhook2.StagingsiteHandler{Client: mgr.GetClient()}
-	if err := stagingsiteHandler.InjectDecoder(decoder); err != nil {
-		setupLog.Error(err, "unable to inject decoder into stagingsite handler")
-		os.Exit(1)
+	stagingsiteHandler := &webhook2.StagingsiteHandler{
+		Client:  mgr.GetClient(),
+		Decoder: decoder,
 	}
 
 	mgr.GetWebhookServer().Register(
@@ -314,12 +312,9 @@ func main() {
 		&webhook.Admission{Handler: stagingsiteHandler},
 	)
 	backupHandler := &webhook2.BackupCreateOrUpdateHandler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}
-	if err := backupHandler.InjectDecoder(decoder); err != nil {
-		setupLog.Error(err, "unable to inject decoder into backup handler")
-		os.Exit(1)
+		Client:  mgr.GetClient(),
+		Scheme:  mgr.GetScheme(),
+		Decoder: decoder,
 	}
 
 	mgr.GetWebhookServer().Register(

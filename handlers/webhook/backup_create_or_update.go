@@ -18,7 +18,7 @@ import (
 type BackupCreateOrUpdateHandler struct {
 	Client  client.Client
 	Scheme  *runtime.Scheme
-	decoder admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -26,7 +26,7 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 	job := &jobv1.Backup{}
 	var err error
 
-	if err = r.decoder.Decode(req, job); nil != err {
+	if err = r.Decoder.Decode(req, job); nil != err {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -65,9 +65,4 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 	}
 
 	return admission.Allowed("")
-}
-
-func (r *BackupCreateOrUpdateHandler) InjectDecoder(d admission.Decoder) error {
-	r.decoder = d
-	return nil
 }

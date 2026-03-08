@@ -97,7 +97,7 @@ func (r *BackupHandler) makeBackupName(
 			63,
 		), nil
 	default:
-		return "", errors.New(fmt.Sprintf("Unhandled backup type: %s", backupType))
+		return "", fmt.Errorf("unhandled backup type: %s", backupType)
 	}
 }
 

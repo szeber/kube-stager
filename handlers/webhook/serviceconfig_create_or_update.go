@@ -17,7 +17,7 @@ import (
 
 type ServiceConfigCreateOrUpdateHandler struct {
 	Client  client.Client
-	decoder admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -25,7 +25,7 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 	config := &configv1.ServiceConfig{}
 	var err error
 
-	if err = r.decoder.Decode(req, config); nil != err {
+	if err = r.Decoder.Decode(req, config); nil != err {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -148,10 +148,5 @@ func (r *ServiceConfigCreateOrUpdateHandler) validateTemplates(
 		}
 	}
 
-	return nil
-}
-
-func (r *ServiceConfigCreateOrUpdateHandler) InjectDecoder(d admission.Decoder) error {
-	r.decoder = d
 	return nil
 }

@@ -62,7 +62,7 @@ const (
 // move the current state of the cluster closer to the desired state.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.23.3/pkg/reconcile
 func (r *DbInitJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
@@ -121,7 +121,7 @@ func (r *DbInitJobReconciler) doReconcile(ctx context.Context, req ctrl.Request)
 		changed, err := r.processRunningJob(&job, ctx)
 		return controller.SaveStatusUpdatesIfObjectChanged(changed, r.Status(), ctx, &job, ctrl.Result{}, err)
 	default:
-		return ctrl.Result{}, errors.New(fmt.Sprintf("Unknown state: %s", job.Status.State))
+		return ctrl.Result{}, fmt.Errorf("unknown state: %s", job.Status.State)
 	}
 }
 
