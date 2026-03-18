@@ -33,7 +33,8 @@ import (
 // MongoDatabaseReconciler reconciles a MongoDatabase object
 type MongoDatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	DatabaseReconciler database.MongoReconciler
 }
 
 //+kubebuilder:rbac:groups=task.operator.kube-stager.io,resources=mongodatabases,verbs=get;list;watch;create;update;patch;delete
@@ -80,7 +81,7 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	isDbChanged := false
 
 	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if err := database.DeleteMongoDatabase(&db, config, logger); nil != err {
+		if err := r.DatabaseReconciler.Delete(&db, config, logger); nil != err {
 			return ctrl.Result{}, err
 		}
 
@@ -104,7 +105,7 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	changed, err := database.ReconcileMongoDatabase(&db, config, logger)
+	changed, err := r.DatabaseReconciler.Reconcile(&db, config, logger)
 
 	isDbChanged = isDbChanged || changed
 
@@ -113,6 +114,9 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MongoDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.DatabaseReconciler == nil {
+		r.DatabaseReconciler = database.DefaultMongoReconciler{}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&taskv1.MongoDatabase{}).
 		Complete(r)

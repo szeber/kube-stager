@@ -1,10 +1,13 @@
 package helpers
 
 import (
-	"github.com/grokify/mogo/encoding/base36"
 	"regexp"
 	"strings"
+
+	"github.com/grokify/mogo/encoding/base36"
 )
+
+var sanitiseDbValueRe = regexp.MustCompile(`[^a-zA-Z0-9_]+`)
 
 func SliceContainsString(slice []string, s string) bool {
 	for _, item := range slice {
@@ -26,10 +29,7 @@ func RemoveStringFromSlice(slice []string, s string) (result []string) {
 }
 
 func SanitiseDbValue(value string) string {
-	re := regexp.MustCompile(`[^a-zA-Z0-9_]+`)
-	result := string(re.ReplaceAll([]byte(strings.Replace(value, "-", "_", -1)), []byte("")))
-
-	return result
+	return string(sanitiseDbValueRe.ReplaceAll([]byte(strings.Replace(value, "-", "_", -1)), []byte("")))
 }
 
 func SanitiseAndShortenDbValue(value string, maxLength int) string {
@@ -42,6 +42,9 @@ func SanitiseAndShortenDbValue(value string, maxLength int) string {
 
 func ShortenHumanReadableValue(value string, maxLength int) string {
 	if len(value) > maxLength {
+		if maxLength <= 11 {
+			return base36.Md5Base36(value)[0:10]
+		}
 		value = value[0:maxLength-11] + "-" + base36.Md5Base36(value)[0:10]
 	}
 	return value
@@ -56,7 +59,7 @@ func MakeObjectName(baseName string, suffixes ...string) string {
 }
 
 func GetKeysFromStringBoolMap(v map[string]bool) []string {
-	result := make([]string, len(v))
+	result := make([]string, 0, len(v))
 	for i := range v {
 		result = append(result, i)
 	}

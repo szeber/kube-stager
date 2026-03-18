@@ -334,15 +334,29 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 		site.Status.State = sitev1.StatePending
 	}
 
+	if site.Annotations == nil {
+		site.Annotations = map[string]string{}
+	}
+
+	annotationNeedsUpdate := false
 	if "" == site.Annotations[annotations.StagingSiteLastSpecChangeAt] {
 		lastSpecChangedAt = r.Clock.Now()
 		site.Annotations[annotations.StagingSiteLastSpecChangeAt] = lastSpecChangedAt.Format(time.RFC3339)
+		annotationNeedsUpdate = true
 	} else if lastSpecChangedAt, err = time.Parse(
 		time.RFC3339,
 		site.Annotations[annotations.StagingSiteLastSpecChangeAt],
 	); nil != err {
 		lastSpecChangedAt = r.Clock.Now()
 		site.Annotations[annotations.StagingSiteLastSpecChangeAt] = lastSpecChangedAt.Format(time.RFC3339)
+		annotationNeedsUpdate = true
+	}
+
+	if annotationNeedsUpdate {
+		if err := r.Update(ctx, site); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 
 	if site.Spec.DisableAfter.Never {
@@ -429,7 +443,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 	}
 
 	if nil != site.Spec.DailyBackupWindowHour {
-		if nil == site.Status.NextBackupTime || site.Status.NextBackupTime.Hour() != int(*site.Spec.DailyBackupWindowHour) {
+		if nil == site.Status.NextBackupTime || site.Status.NextBackupTime.UTC().Hour() != int(*site.Spec.DailyBackupWindowHour) {
 			site.Status.NextBackupTime, err = r.getNextBackupTimeForSite(site)
 			if nil != err {
 				return isChanged, err
@@ -467,10 +481,10 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 		}
 		if nil == metav1.GetControllerOf(&backup) {
 			if err = ctrl.SetControllerReference(site, &backup, r.Scheme); nil != err {
-				return isChanged, nil
+				return isChanged, err
 			}
 			if err = r.Update(ctx, &backup); nil != err {
-				return isChanged, nil
+				return isChanged, err
 			}
 			backupControlClaimed = true
 		}
@@ -713,35 +727,32 @@ func (r *StagingSiteReconciler) setSiteState(site *sitev1.StagingSite) {
 		return
 	}
 
-	status := site.Status
-
-	if status.DatabaseCreationComplete &&
-		status.DatabaseInitialisationComplete &&
-		status.DatabaseMigrationsComplete &&
-		status.ConfigsAreCreated &&
-		status.NetworkingObjectsAreCreated &&
-		status.WorkloadsAreCreated &&
+	if site.Status.DatabaseCreationComplete &&
+		site.Status.DatabaseInitialisationComplete &&
+		site.Status.DatabaseMigrationsComplete &&
+		site.Status.ConfigsAreCreated &&
+		site.Status.NetworkingObjectsAreCreated &&
+		site.Status.WorkloadsAreCreated &&
 		nil == site.DeletionTimestamp {
 		site.Status.State = sitev1.StateComplete
 	} else {
 		site.Status.State = sitev1.StatePending
 	}
 
-	if status.State != sitev1.StateComplete {
-		status.WorkloadHealth = sitev1.WorkloadHealthIncomplete
+	if site.Status.State != sitev1.StateComplete {
+		site.Status.WorkloadHealth = sitev1.WorkloadHealthIncomplete
 	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *StagingSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// set up a real clock, since we're not in a test
+	// Default to real clock when not injected by tests
 	if r.Clock == nil {
 		r.Clock = realClock{}
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(), &configv1.ServiceConfig{}, indexes.ShortName, func(rawObj client.Object) []string {
-			// grab the config object, extract the short name.
 			config := rawObj.(*configv1.ServiceConfig)
 			return []string{config.Spec.ShortName}
 		},
@@ -787,9 +798,8 @@ func (r *StagingSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(), &jobv1.Backup{}, indexes.SiteName, func(rawObj client.Object) []string {
-			// grab the config object, extract the short name.
-			config := rawObj.(*jobv1.Backup)
-			return []string{config.Spec.SiteName}
+			backup := rawObj.(*jobv1.Backup)
+			return []string{backup.Spec.SiteName}
 		},
 	); err != nil {
 		return err

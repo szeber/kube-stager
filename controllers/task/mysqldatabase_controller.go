@@ -33,7 +33,8 @@ import (
 // MysqlDatabaseReconciler reconciles a MysqlDatabase object
 type MysqlDatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	DatabaseReconciler database.MysqlReconciler
 }
 
 //+kubebuilder:rbac:groups=config.operator.kube-stager.io,resources=mysqlconfigs,verbs=get
@@ -81,7 +82,7 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	isDbChanged := false
 
 	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if err := database.DeleteMysqlDatabase(&db, config, logger); nil != err {
+		if err := r.DatabaseReconciler.Delete(&db, config, logger); nil != err {
 			return ctrl.Result{}, err
 		}
 
@@ -105,7 +106,7 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	changed, err := database.ReconcileMysqlDatabase(&db, config, logger)
+	changed, err := r.DatabaseReconciler.Reconcile(&db, config, logger)
 
 	isDbChanged = isDbChanged || changed
 
@@ -114,6 +115,9 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MysqlDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.DatabaseReconciler == nil {
+		r.DatabaseReconciler = database.DefaultMysqlReconciler{}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&taskv1.MysqlDatabase{}).
 		Complete(r)

@@ -33,7 +33,8 @@ import (
 // RedisDatabaseReconciler reconciles a RedisDatabase object
 type RedisDatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	DatabaseReconciler database.RedisReconciler
 }
 
 //+kubebuilder:rbac:groups=task.operator.kube-stager.io,resources=redisdatabases,verbs=get;list;watch;create;update;patch;delete
@@ -77,13 +78,16 @@ func (r *RedisDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
-	changed, err := database.ReconcileRedis(&db, config, logger)
+	changed, err := r.DatabaseReconciler.Reconcile(&db, config, logger)
 
 	return controller.SaveStatusUpdatesIfObjectChanged(changed, r.Status(), ctx, &db, ctrl.Result{}, err)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RedisDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.DatabaseReconciler == nil {
+		r.DatabaseReconciler = database.DefaultRedisReconciler{}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&taskv1.RedisDatabase{}).
 		Complete(r)
