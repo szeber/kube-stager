@@ -198,7 +198,7 @@ func (r *DbMigrationJobReconciler) createJobIfNeeded(job *jobv1.DbMigrationJob, 
 	logger.V(0).Info("Creating job")
 	batchJob, err := r.createJob(ctx, job, serviceConfig)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	if err := r.Create(ctx, batchJob); err != nil {

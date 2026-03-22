@@ -213,7 +213,7 @@ func (r *mysqlReconcileTask) reconcilePermissions() error {
 	havePerms, err := r.revokeNotRequestedPermissions()
 
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if !havePerms {

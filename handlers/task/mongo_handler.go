@@ -107,7 +107,7 @@ func (r MongoTaskHandler) EnsureDatabasesAreReady(site *sitev1.StagingSite, ctx 
 	isEverythingReady := true
 
 	for _, database := range list.Items {
-		if taskv1.Failed == database.Status.State {
+		if database.Status.State == taskv1.Failed {
 			return false, errors.DatabaseCreationError{
 				DatabaseType:      errors.DatabaseTypeMongo,
 				EnvironmentConfig: database.Spec.EnvironmentConfig,

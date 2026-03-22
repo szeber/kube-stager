@@ -108,7 +108,7 @@ func (r DbInitJobHandler) EnsureJobsAreComplete(site *sitev1.StagingSite, ctx co
 	isEverythingReady := true
 
 	for _, database := range list.Items {
-		if jobv1.Failed == database.Status.State {
+		if database.Status.State == jobv1.Failed {
 			return false, errors.DatabaseInitError{
 				SiteName:    database.Spec.SiteName,
 				ServiceName: database.Spec.ServiceName,

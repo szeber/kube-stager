@@ -162,7 +162,7 @@ func (r *BackupReconciler) ensureJobsAreUpToDate(ctx context.Context, job *jobv1
 		return isChanged, err
 	}
 
-	if jobv1.Failed != job.Status.State && allServicesFinished {
+	if job.Status.State != jobv1.Failed && allServicesFinished {
 		job.Status.State = jobv1.Complete
 		if lastFinishedAt != nil {
 			job.Status.JobFinishedAt = &metav1.Time{Time: *lastFinishedAt}
@@ -190,10 +190,11 @@ func (r *BackupReconciler) processServiceInJob(
 		serviceStatus := job.Status.Services[name]
 
 		if serviceStatus.State.IsFinal() {
-			if jobv1.Failed == serviceStatus.State {
+			switch serviceStatus.State {
+			case jobv1.Failed:
 				job.Status.State = jobv1.Failed
 				isChanged = true
-			} else if jobv1.Complete == serviceStatus.State {
+			case jobv1.Complete:
 				if lastFinishedAt == nil || lastFinishedAt.Before(serviceStatus.JobFinishedAt.Time) {
 					lastFinishedAt = &serviceStatus.JobFinishedAt.Time
 					isChanged = true

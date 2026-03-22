@@ -470,7 +470,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 	backupControlClaimed := false
 
 	for _, backup := range backupList.Items {
-		if jobv1.Complete == backup.Status.State && backup.Status.JobFinishedAt != nil {
+		if backup.Status.State == jobv1.Complete && backup.Status.JobFinishedAt != nil {
 			if lastBackupTime == nil || lastBackupTime.Before(backup.Status.JobFinishedAt) {
 				lastBackupTime = backup.Status.JobFinishedAt
 				isChanged = true
@@ -525,7 +525,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 }
 
 func (r *StagingSiteReconciler) resetStatusErrors(site *sitev1.StagingSite) {
-	if sitev1.StateFailed == site.Status.State {
+	if site.Status.State == sitev1.StateFailed {
 		// If we are in a failed state reset to pending and clear the error message so they can be set and populated if
 		// the child resources still require that
 		site.Status.State = sitev1.StatePending
@@ -723,7 +723,7 @@ func (r *StagingSiteReconciler) SaveStatusUpdatesIfObjectChanged(
 }
 
 func (r *StagingSiteReconciler) setSiteState(site *sitev1.StagingSite) {
-	if sitev1.StateFailed == site.Status.State {
+	if site.Status.State == sitev1.StateFailed {
 		return
 	}
 

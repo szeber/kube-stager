@@ -72,9 +72,10 @@ func (r *BackupHandler) EnsureFinalBackupIsComplete(site *sitev1.StagingSite, ct
 		logger.V(1).Info("Backup job created")
 	} else {
 		logger.V(0).Info("Existing backup job found", "job", job)
-		if jobv1.Complete == job.Status.State {
+		switch job.Status.State {
+		case jobv1.Complete:
 			return true, nil
-		} else if jobv1.Failed == job.Status.State {
+		case jobv1.Failed:
 			logger.Error(errors.New("the existing backup job is in a failed state"), "Backup failed", "job", job)
 			return true, nil
 		}
@@ -118,7 +119,7 @@ func (r *BackupHandler) createJob(
 	}
 
 	if err := ctrl.SetControllerReference(site, job, r.Scheme); err != nil {
-		return job, nil
+		return job, err
 	}
 
 	return job, nil

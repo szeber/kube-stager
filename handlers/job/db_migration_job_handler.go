@@ -125,7 +125,7 @@ func (r DbMigrationJobHandler) EnsureJobsAreComplete(site *sitev1.StagingSite, c
 	isEverythingReady := true
 
 	for _, database := range list.Items {
-		if jobv1.Failed == database.Status.State {
+		if database.Status.State == jobv1.Failed {
 			return false, errors.DatabaseMigrationError{
 				SiteName:    database.Spec.SiteName,
 				ServiceName: database.Spec.ServiceName,
