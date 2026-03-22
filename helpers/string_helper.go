@@ -29,7 +29,7 @@ func RemoveStringFromSlice(slice []string, s string) (result []string) {
 }
 
 func SanitiseDbValue(value string) string {
-	return string(sanitiseDbValueRe.ReplaceAll([]byte(strings.Replace(value, "-", "_", -1)), []byte("")))
+	return string(sanitiseDbValueRe.ReplaceAll([]byte(strings.ReplaceAll(value, "-", "_")), []byte("")))
 }
 
 func SanitiseAndShortenDbValue(value string, maxLength int) string {

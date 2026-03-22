@@ -25,46 +25,46 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 	site := &sitev1.StagingSite{}
 	var err error
 
-	if err = r.Decoder.Decode(req, site); nil != err {
+	if err = r.Decoder.Decode(req, site); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	serviceConfigs, err := kubernetes.GetServiceConfigsInNamespace(site.Namespace, r.Client, ctx)
-	if nil != err {
+	if err != nil {
 		logger.Error(err, "Failed to list the service configs")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	mysqlEnvironments, err := kubernetes.GetMysqlEnvironmentsInNamespace(site.Namespace, r.Client, ctx)
-	if nil != err {
+	if err != nil {
 		logger.Error(err, "Failed to list the service configs")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	mongoEnvironments, err := kubernetes.GetMongoEnvironmentsInNamespace(site.Namespace, r.Client, ctx)
-	if nil != err {
+	if err != nil {
 		logger.Error(err, "Failed to list the service configs")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	redisEnvironments, err := kubernetes.GetRedisEnvironmentsInNamespace(site.Namespace, r.Client, ctx)
-	if nil != err {
+	if err != nil {
 		logger.Error(err, "Failed to list the service configs")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
 	if site.Spec.IncludeAllServices {
 		logger.Info("Adding all services to the site")
-		if 0 == len(site.Spec.Services) {
+		if len(site.Spec.Services) == 0 {
 			site.Spec.Services = make(map[string]sitev1.StagingSiteService, len(serviceConfigs))
 		}
 		for _, serviceConfig := range serviceConfigs {
 			serviceSpec := site.Spec.Services[serviceConfig.Name]
-			if 0 == len(serviceSpec.CustomTemplateValues) {
+			if len(serviceSpec.CustomTemplateValues) == 0 {
 				serviceSpec.CustomTemplateValues = make(map[string]string)
 			}
 			site.Spec.Services[serviceConfig.Name] = serviceSpec
 		}
 	}
 
-	if 0 == len(site.Spec.Services) {
+	if len(site.Spec.Services) == 0 {
 		return admission.Denied("There are no services defined in the site")
 	}
 
@@ -79,22 +79,22 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 		if !ok {
 			return admission.Denied("The service config '" + name + "' doesn't exist")
 		}
-		if "" == serviceSpec.ImageTag {
+		if serviceSpec.ImageTag == "" {
 			serviceSpec.ImageTag = "latest"
 		}
-		if "" == serviceSpec.DbInitSourceEnvironmentName {
+		if serviceSpec.DbInitSourceEnvironmentName == "" {
 			serviceSpec.DbInitSourceEnvironmentName = "master"
 		}
-		if "" == serviceSpec.MongoEnvironment {
+		if serviceSpec.MongoEnvironment == "" {
 			serviceSpec.MongoEnvironment = config.Spec.DefaultMongoEnvironment
 		}
-		if "" == serviceSpec.MysqlEnvironment {
+		if serviceSpec.MysqlEnvironment == "" {
 			serviceSpec.MysqlEnvironment = config.Spec.DefaultMysqlEnvironment
 		}
-		if "" == serviceSpec.RedisEnvironment {
+		if serviceSpec.RedisEnvironment == "" {
 			serviceSpec.RedisEnvironment = config.Spec.DefaultRedisEnvironment
 		}
-		if "" != serviceSpec.MongoEnvironment {
+		if serviceSpec.MongoEnvironment != "" {
 			if mongoEnvironments[serviceSpec.MongoEnvironment].Name == "" {
 				return admission.Denied(
 					fmt.Sprintf(
@@ -107,7 +107,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 				usedMongoEnvironmentNames[serviceSpec.MongoEnvironment] = true
 			}
 		}
-		if "" != serviceSpec.MysqlEnvironment {
+		if serviceSpec.MysqlEnvironment != "" {
 			if mysqlEnvironments[serviceSpec.MysqlEnvironment].Name == "" {
 				return admission.Denied(
 					fmt.Sprintf(
@@ -120,7 +120,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 				usedMysqlEnvironmentNames[serviceSpec.MysqlEnvironment] = true
 			}
 		}
-		if "" != serviceSpec.RedisEnvironment {
+		if serviceSpec.RedisEnvironment != "" {
 			if redisEnvironments[serviceSpec.RedisEnvironment].Name == "" {
 				return admission.Denied(
 					fmt.Sprintf(
@@ -163,7 +163,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 
 func (r *StagingsiteHandler) updatePrefixedLabels(site *sitev1.StagingSite, prefix string, values []string) {
 	siteLabels := site.Labels
-	if 0 == len(siteLabels) {
+	if len(siteLabels) == 0 {
 		siteLabels = make(map[string]string, len(values))
 	}
 	for k := range site.Labels {
@@ -172,7 +172,7 @@ func (r *StagingsiteHandler) updatePrefixedLabels(site *sitev1.StagingSite, pref
 		}
 	}
 	for _, v := range values {
-		if "" == v {
+		if v == "" {
 			continue
 		}
 		siteLabels[prefix+v] = "true"

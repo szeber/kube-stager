@@ -28,7 +28,7 @@ func (r *RedisConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 		client.InNamespace(req.Namespace),
 		client.MatchingLabels{labels.RedisEnvironmentsPrefix + req.Name: "true"},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
@@ -53,7 +53,7 @@ func (r *RedisConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 		client.InNamespace(req.Namespace),
 		client.MatchingFields{indexes.DefaultRedisEnvironment: req.Name},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 

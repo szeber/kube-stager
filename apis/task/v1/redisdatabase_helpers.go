@@ -15,24 +15,24 @@ func (r *RedisDatabase) PopulateFomSite(
 	config *configv1.ServiceConfig,
 	environmentName string,
 ) error {
-	if nil == config {
-		return errors.New("No service config provided")
+	if config == nil {
+		return errors.New("no service config provided")
 	}
 
 	r.ObjectMeta = metav1.ObjectMeta{
-		Name:      helpers.ShortenHumanReadableValue(site.ObjectMeta.Name, 50) + "-" + config.Spec.ShortName,
-		Namespace: site.ObjectMeta.Namespace,
+		Name:      helpers.ShortenHumanReadableValue(site.Name, 50) + "-" + config.Spec.ShortName,
+		Namespace: site.Namespace,
 		Labels: map[string]string{
-			labels.Site:             site.ObjectMeta.Name,
-			labels.Service:          config.ObjectMeta.Name,
+			labels.Site:             site.Name,
+			labels.Service:          config.Name,
 			labels.RedisEnvironment: environmentName,
 		},
 		Annotations: map[string]string{},
 	}
 	r.Spec = RedisDatabaseSpec{
 		EnvironmentConfig: EnvironmentConfig{
-			ServiceName: config.ObjectMeta.Name,
-			SiteName:    site.ObjectMeta.Name,
+			ServiceName: config.Name,
+			SiteName:    site.Name,
 			Environment: environmentName,
 		},
 	}
@@ -42,14 +42,14 @@ func (r *RedisDatabase) PopulateFomSite(
 
 func (r *RedisDatabase) Matches(other RedisDatabase) bool {
 	return reflect.DeepEqual(r.Spec.EnvironmentConfig, other.Spec.EnvironmentConfig) &&
-		r.ObjectMeta.Name == other.ObjectMeta.Name &&
-		r.ObjectMeta.Namespace == other.ObjectMeta.Namespace &&
-		reflect.DeepEqual(r.ObjectMeta.Labels, other.ObjectMeta.Labels)
+		r.Name == other.Name &&
+		r.Namespace == other.Namespace &&
+		reflect.DeepEqual(r.Labels, other.Labels)
 }
 
 func (r *RedisDatabase) UpdateFromExpected(expected RedisDatabase) {
 	r.Spec = expected.Spec
-	r.ObjectMeta.Name = expected.ObjectMeta.Name
-	r.ObjectMeta.Namespace = expected.ObjectMeta.Namespace
-	r.ObjectMeta.Labels = expected.ObjectMeta.Labels
+	r.Name = expected.Name
+	r.Namespace = expected.Namespace
+	r.Labels = expected.Labels
 }

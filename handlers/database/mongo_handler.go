@@ -22,22 +22,17 @@ type mongoReconcileTask struct {
 	database   string
 }
 
-type mongoUserResult struct {
-	User         string
-	PasswordHash string
-}
-
 func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.MongoConfig, logger logr.Logger) (
 	bool,
 	error,
 ) {
 	client, ctx, cancel, err := getMongoConnection(config, logger)
 
-	if nil != cancel {
+	if cancel != nil {
 		defer cancel()
 	}
 
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -50,7 +45,7 @@ func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.Mong
 		database:   database.Spec.DatabaseName,
 	}
 
-	if err := task.reconcileTask(); nil != err {
+	if err := task.reconcileTask(); err != nil {
 		return false, err
 	}
 
@@ -66,11 +61,11 @@ func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.Mong
 func DeleteMongoDatabase(database *taskv1.MongoDatabase, config configv1.MongoConfig, logger logr.Logger) error {
 	client, ctx, cancel, err := getMongoConnection(config, logger)
 
-	if nil != cancel {
+	if cancel != nil {
 		defer cancel()
 	}
 
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
@@ -102,16 +97,11 @@ func getMongoConnection(config configv1.MongoConfig, logger logr.Logger) (
 		config.Spec.Port,
 	)
 
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
-
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	connectionCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	ctx := context.Background()
 
-	if err = client.Connect(connectionCtx); err != nil {
+	client, err := mongo.Connect(connectionCtx, options.Client().ApplyURI(uri))
+	if err != nil {
 		return nil, nil, cancel, err
 	}
 
@@ -131,11 +121,11 @@ func (r *mongoReconcileTask) reconcileTask() error {
 func (r *mongoReconcileTask) deleteTask() error {
 	r.logger.Info("Deleting task")
 
-	if err := r.removeDatabase(); nil != err {
+	if err := r.removeDatabase(); err != nil {
 		return err
 	}
 
-	if err := r.removeUser(); nil != err {
+	if err := r.removeUser(); err != nil {
 		return err
 	}
 
@@ -190,7 +180,7 @@ func (r *mongoReconcileTask) updateUser() error {
 				},
 			},
 		},
-	).DecodeBytes()
+	).Raw()
 
 	return err
 }
@@ -209,7 +199,7 @@ func (r *mongoReconcileTask) createUser() error {
 				},
 			},
 		},
-	).DecodeBytes()
+	).Raw()
 
 	return err
 }
@@ -239,7 +229,7 @@ func (r *mongoReconcileTask) removeUser() error {
 		return nil
 	}
 
-	if userExists, err := r.checkUserExists(); nil != err {
+	if userExists, err := r.checkUserExists(); err != nil {
 		return err
 	} else if !userExists {
 		r.logger.Info("The user " + r.username + " doesn't exist")
@@ -252,7 +242,7 @@ func (r *mongoReconcileTask) removeUser() error {
 	_, err := r.connection.Database("admin").RunCommand(
 		r.ctx,
 		bson.D{{Key: "dropUser", Value: r.username}},
-	).DecodeBytes()
+	).Raw()
 
 	return err
 }

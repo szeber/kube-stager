@@ -45,19 +45,19 @@ func LoadConfigs(handler DatabaseHandler, ctx context.Context, reader client.Rea
 	namespace := handler.getNamespace()
 
 	mongoConfigs, err := ListMongoConfigsInNamespace(namespace, ctx, reader)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 	handler.SetMongo(mongoConfigs)
 
 	mysqlConfigs, err := ListMysqlConfigsInNamespace(namespace, ctx, reader)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 	handler.SetMysql(mysqlConfigs)
 
 	redisConfigs, err := ListRedisConfigsInNamespace(namespace, ctx, reader)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 	handler.SetRedis(redisConfigs)
@@ -69,7 +69,7 @@ func ListMongoConfigsInNamespace(namespace string, ctx context.Context, reader c
 	configs := make(map[string]configv1.MongoConfig)
 	list := configv1.MongoConfigList{}
 
-	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); nil != err {
+	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); err != nil {
 		return configs, err
 	}
 
@@ -84,7 +84,7 @@ func ListMysqlConfigsInNamespace(namespace string, ctx context.Context, reader c
 	list := configv1.MysqlConfigList{}
 	configs := make(map[string]configv1.MysqlConfig)
 
-	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); nil != err {
+	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); err != nil {
 		return configs, err
 	}
 
@@ -98,7 +98,7 @@ func ListRedisConfigsInNamespace(namespace string, ctx context.Context, reader c
 	list := configv1.RedisConfigList{}
 	configs := make(map[string]configv1.RedisConfig)
 
-	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); nil != err {
+	if err := reader.List(ctx, &list, &client.ListOptions{Namespace: namespace}); err != nil {
 		return configs, err
 	}
 
@@ -114,7 +114,7 @@ func LoadServiceConfigs(handler DatabaseHandler, ctx context.Context, reader cli
 
 	configList := configv1.ServiceConfigList{}
 	configs := make(map[string]configv1.ServiceConfig)
-	if err := reader.List(ctx, &configList, client.InNamespace(namespace)); nil != err {
+	if err := reader.List(ctx, &configList, client.InNamespace(namespace)); err != nil {
 		return err
 	}
 	for _, v := range configList.Items {
@@ -154,7 +154,7 @@ func (r *SiteTemplateHandler) SetServiceConfigs(configs map[string]configv1.Serv
 }
 
 func (r *SiteTemplateHandler) SetServiceConfig(name string, config configv1.ServiceConfig) {
-	if 0 == len(r.serviceConfigs) {
+	if len(r.serviceConfigs) == 0 {
 		r.serviceConfigs = make(map[string]configv1.ServiceConfig)
 	}
 	r.serviceConfigs[name] = config
@@ -228,8 +228,8 @@ func (r *SiteTemplateHandler) getMysqlConfigTemplateValues(
 	result := make(map[string]string)
 	var configName string
 
-	if "" == siteEnvironmentName {
-		if "" == serviceDefaultEnvironmentName {
+	if siteEnvironmentName == "" {
+		if serviceDefaultEnvironmentName == "" {
 			return result
 		} else {
 			configName = serviceDefaultEnvironmentName
@@ -253,8 +253,8 @@ func (r *SiteTemplateHandler) getMongoConfigTemplateValues(
 	result := make(map[string]string)
 	var configName string
 
-	if "" == siteEnvironmentName {
-		if "" == serviceDefaultEnvironmentName {
+	if siteEnvironmentName == "" {
+		if serviceDefaultEnvironmentName == "" {
 			return result
 		} else {
 			configName = serviceDefaultEnvironmentName
@@ -280,8 +280,8 @@ func (r *SiteTemplateHandler) getRedisConfigTemplateValues(
 	result := make(map[string]string)
 	var configName string
 
-	if "" == siteEnvironmentName {
-		if "" == serviceDefaultEnvironmentName {
+	if siteEnvironmentName == "" {
+		if serviceDefaultEnvironmentName == "" {
 			return result
 		} else {
 			configName = serviceDefaultEnvironmentName
@@ -292,7 +292,7 @@ func (r *SiteTemplateHandler) getRedisConfigTemplateValues(
 
 	redisConfig := redisConfigs[configName]
 	scheme := "tcp"
-	if nil != redisConfig.Spec.IsTlsEnabled && *redisConfig.Spec.IsTlsEnabled {
+	if redisConfig.Spec.IsTlsEnabled != nil && *redisConfig.Spec.IsTlsEnabled {
 		scheme = "tls"
 	}
 	result["database.redis.scheme"] = scheme

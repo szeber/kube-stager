@@ -37,7 +37,7 @@ const (
 )
 
 func (r DatabaseCreationError) Error() string {
-	if "" == r.Reason {
+	if r.Reason == "" {
 		return fmt.Sprintf(
 			"Failed to create %s database for site %s, service %s in environment %s",
 			r.DatabaseType,
@@ -62,7 +62,7 @@ func (r DatabaseCreationError) IsFinal() bool {
 }
 
 func (r DatabaseInitError) Error() string {
-	if "" == r.Reason {
+	if r.Reason == "" {
 		return fmt.Sprintf(
 			"Database initialisation failed for site %s, service %s",
 			r.SiteName,
@@ -83,7 +83,7 @@ func (r DatabaseInitError) IsFinal() bool {
 }
 
 func (r DatabaseMigrationError) Error() string {
-	if "" == r.Reason {
+	if r.Reason == "" {
 		return fmt.Sprintf(
 			"Database migration failed for site %s, service %s",
 			r.SiteName,

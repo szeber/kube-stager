@@ -69,7 +69,7 @@ var _ = Describe("MongoDatabaseController", func() {
 			fetched := &taskv1.MongoDatabase{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(dbObj), fetched)).To(Succeed())
-				g.Expect(fetched.ObjectMeta.Finalizers).To(ContainElement(helpers.MongoFinalizerName))
+				g.Expect(fetched.Finalizers).To(ContainElement(helpers.MongoFinalizerName))
 				g.Expect(fetched.Status.State).To(Equal(taskv1.Complete))
 			}, timeout, interval).Should(Succeed())
 		})
@@ -164,7 +164,7 @@ var _ = Describe("MongoDatabaseController", func() {
 			fetched := &taskv1.MongoDatabase{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(dbObj), fetched)).To(Succeed())
-				g.Expect(fetched.ObjectMeta.Finalizers).To(ContainElement(helpers.MongoFinalizerName))
+				g.Expect(fetched.Finalizers).To(ContainElement(helpers.MongoFinalizerName))
 				g.Expect(fetched.Status.State).To(Equal(taskv1.Complete))
 			}, timeout, interval).Should(Succeed())
 		})

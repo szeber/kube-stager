@@ -30,13 +30,13 @@ func (r NetworkingHandler) EnsureNetworkingObjectsAreUpToDate(site *sitev1.Stagi
 	previousComplete := site.Status.NetworkingObjectsAreCreated
 	isComplete := true
 
-	if complete, err := r.ensureServicesAreUpToDate(site, ctx); nil != err {
+	if complete, err := r.ensureServicesAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isComplete = isComplete && complete
 	}
 
-	if complete, err := r.ensureIngressesAreUpToDate(site, ctx); nil != err {
+	if complete, err := r.ensureIngressesAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isComplete = isComplete && complete
@@ -61,13 +61,13 @@ func (r NetworkingHandler) ensureServicesAreUpToDate(site *sitev1.StagingSite, c
 			labels.Site: site.Name,
 		},
 	)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
 	if !site.Status.Enabled {
 		for _, service := range list.Items {
-			if err := r.Writer.Delete(ctx, &service); nil != err {
+			if err := r.Writer.Delete(ctx, &service); err != nil {
 				return false, err
 			}
 		}
@@ -79,22 +79,22 @@ func (r NetworkingHandler) ensureServicesAreUpToDate(site *sitev1.StagingSite, c
 
 	for name := range site.Spec.Services {
 		config := &configv1.ServiceConfig{}
-		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); nil != err {
+		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); err != nil {
 			return false, err
 		}
 
-		if nil == config.Spec.ServiceSpec {
+		if config.Spec.ServiceSpec == nil {
 			continue
 		}
 
 		servicesToCreate[name], err = r.createService(ctx, site, config)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 	}
 
 	for _, service := range list.Items {
-		serviceName := service.ObjectMeta.Labels[labels.Service]
+		serviceName := service.Labels[labels.Service]
 
 		if _, ok := servicesToCreate[serviceName]; ok {
 			delete(servicesToCreate, serviceName)
@@ -105,13 +105,13 @@ func (r NetworkingHandler) ensureServicesAreUpToDate(site *sitev1.StagingSite, c
 
 	for serviceName, database := range servicesToDelete {
 		logger.V(1).Info("Deleting service for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &database); nil != err {
+		if err = r.Writer.Delete(ctx, &database); err != nil {
 			return false, err
 		}
 	}
 	for serviceName, database := range servicesToCreate {
 		logger.V(1).Info("Creating service for service " + serviceName)
-		if err = r.Writer.Create(ctx, &database); nil != err {
+		if err = r.Writer.Create(ctx, &database); err != nil {
 			return false, err
 		}
 	}
@@ -135,13 +135,13 @@ func (r NetworkingHandler) ensureIngressesAreUpToDate(site *sitev1.StagingSite, 
 			labels.Site: site.Name,
 		},
 	)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
 	if !site.Status.Enabled {
 		for _, service := range list.Items {
-			if err := r.Writer.Delete(ctx, &service); nil != err {
+			if err := r.Writer.Delete(ctx, &service); err != nil {
 				return false, err
 			}
 		}
@@ -153,23 +153,23 @@ func (r NetworkingHandler) ensureIngressesAreUpToDate(site *sitev1.StagingSite, 
 
 	for name := range site.Spec.Services {
 		config := &configv1.ServiceConfig{}
-		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); nil != err {
+		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); err != nil {
 			return false, err
 		}
 
-		if nil == config.Spec.IngressSpec {
+		if config.Spec.IngressSpec == nil {
 			continue
 		}
 
 		ingress, err := r.createIngress(ctx, site, config)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 		ingressesToCreate[name] = ingress
 	}
 
 	for _, ingress := range list.Items {
-		serviceName := ingress.ObjectMeta.Labels[labels.Service]
+		serviceName := ingress.Labels[labels.Service]
 
 		if _, ok := ingressesToCreate[serviceName]; ok {
 			delete(ingressesToCreate, serviceName)
@@ -180,13 +180,13 @@ func (r NetworkingHandler) ensureIngressesAreUpToDate(site *sitev1.StagingSite, 
 
 	for ingressName, database := range ingressesToDelete {
 		logger.V(1).Info("Deleting ingress for service " + ingressName)
-		if err = r.Writer.Delete(ctx, &database); nil != err {
+		if err = r.Writer.Delete(ctx, &database); err != nil {
 			return false, err
 		}
 	}
 	for ingressName, database := range ingressesToCreate {
 		logger.V(1).Info("Creating ingress for service " + ingressName)
-		if err = r.Writer.Create(ctx, &database); nil != err {
+		if err = r.Writer.Create(ctx, &database); err != nil {
 			return false, err
 		}
 	}
@@ -203,11 +203,11 @@ func (r NetworkingHandler) createService(
 ) (corev1.Service, error) {
 	siteTemplateHandler := template.NewSite(*site, *config)
 	err := template.LoadConfigs(&siteTemplateHandler, ctx, r.Reader)
-	if nil != err {
+	if err != nil {
 		return corev1.Service{}, err
 	}
 	replacedSpec, err := helpers.ReplaceTemplateVariablesInServiceSpec(*config.Spec.ServiceSpec, &siteTemplateHandler)
-	if nil != err {
+	if err != nil {
 		return corev1.Service{}, err
 	}
 	replacedSpec.Selector = map[string]string{
@@ -226,7 +226,7 @@ func (r NetworkingHandler) createService(
 		Spec: replacedSpec,
 	}
 
-	if err := ctrl.SetControllerReference(site, &service, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, &service, r.Scheme); err != nil {
 		return service, err
 	}
 
@@ -240,7 +240,7 @@ func (r NetworkingHandler) createIngress(
 ) (networkingv1.Ingress, error) {
 	siteTemplateHandler := template.NewSite(*site, *config)
 	err := template.LoadConfigs(&siteTemplateHandler, ctx, r.Reader)
-	if nil != err {
+	if err != nil {
 		return networkingv1.Ingress{}, err
 	}
 	boolTrue := true
@@ -256,10 +256,10 @@ func (r NetworkingHandler) createIngress(
 			},
 		},
 	)
-	if nil != err {
+	if err != nil {
 		return networkingv1.Ingress{}, err
 	}
-	if 0 == len(config.Spec.IngressAnnotations) {
+	if len(config.Spec.IngressAnnotations) == 0 {
 		config.Spec.IngressAnnotations = make(map[string]string)
 	}
 	ingress := networkingv1.Ingress{
@@ -285,7 +285,7 @@ func (r NetworkingHandler) createIngress(
 		Spec: replacedSpec,
 	}
 
-	if err := ctrl.SetControllerReference(site, &ingress, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, &ingress, r.Scheme); err != nil {
 		return ingress, err
 	}
 

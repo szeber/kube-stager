@@ -15,25 +15,25 @@ func (r *StagingSite) GetServiceStatus(serviceName string) *StagingSiteServiceSt
 }
 
 func (r *StagingSite) isTimeIntervalEmpty(i TimeInterval) bool {
-	return false == i.Never && 0 == i.Days && 0 == i.Hours && 0 == i.Minutes
+	return !i.Never && i.Days == 0 && i.Hours == 0 && i.Minutes == 0
 }
 
 func (r StagingSite) GetMongoConfigForService(serviceConfig configv1.ServiceConfig) string {
-	if "" != r.Spec.Services[serviceConfig.Name].MongoEnvironment {
+	if r.Spec.Services[serviceConfig.Name].MongoEnvironment != "" {
 		return r.Spec.Services[serviceConfig.Name].MongoEnvironment
 	}
 	return serviceConfig.Spec.DefaultMongoEnvironment
 }
 
 func (r StagingSite) GetMysqlConfigForService(serviceConfig configv1.ServiceConfig) string {
-	if "" != r.Spec.Services[serviceConfig.Name].MysqlEnvironment {
+	if r.Spec.Services[serviceConfig.Name].MysqlEnvironment != "" {
 		return r.Spec.Services[serviceConfig.Name].MysqlEnvironment
 	}
 	return serviceConfig.Spec.DefaultMysqlEnvironment
 }
 
 func (r StagingSite) GetRedisConfigForService(serviceConfig configv1.ServiceConfig) string {
-	if "" != r.Spec.Services[serviceConfig.Name].RedisEnvironment {
+	if r.Spec.Services[serviceConfig.Name].RedisEnvironment != "" {
 		return r.Spec.Services[serviceConfig.Name].RedisEnvironment
 	}
 	return serviceConfig.Spec.DefaultRedisEnvironment

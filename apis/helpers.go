@@ -9,7 +9,7 @@ import (
 )
 
 func MakeDatabaseName(site *sitev1.StagingSite, service *configv1.ServiceConfig) string {
-	return strings.Replace(
+	return strings.ReplaceAll(
 		helpers.ShortenHumanReadableValue(
 			fmt.Sprintf(
 				"%s_%s",
@@ -20,7 +20,6 @@ func MakeDatabaseName(site *sitev1.StagingSite, service *configv1.ServiceConfig)
 		),
 		"-",
 		"_",
-		-1,
 	)
 }
 

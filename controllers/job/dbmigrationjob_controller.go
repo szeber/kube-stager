@@ -62,7 +62,7 @@ type DbMigrationJobReconciler struct {
 func (r *DbMigrationJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
 		sentry.CaptureException(err)
 	}
 
@@ -84,7 +84,7 @@ func (r *DbMigrationJobReconciler) doReconcile(ctx context.Context, req ctrl.Req
 
 	if job.Spec.ImageTag != job.Status.LastMigratedImageTag {
 		logger.V(0).Info("Either this is a new job, or the image name has changed. Updating job state")
-		if err := r.deleteAssociatedJobs(&job, ctx); nil != err {
+		if err := r.deleteAssociatedJobs(&job, ctx); err != nil {
 			return controller.SaveStatusUpdatesIfObjectChanged(false, r.Status(), ctx, &job, ctrl.Result{}, err)
 		}
 		job.Status.State = jobv1.Pending
@@ -120,7 +120,7 @@ func (r *DbMigrationJobReconciler) processRunningJob(job *jobv1.DbMigrationJob, 
 	logger.V(0).Info("Loading migration job")
 
 	jobList, err := r.getOwnedMigrationJobs(job, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -180,7 +180,7 @@ func (r *DbMigrationJobReconciler) createJobIfNeeded(job *jobv1.DbMigrationJob, 
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("Job is in Pending state")
 	jobList, err := r.getOwnedMigrationJobs(job, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -191,17 +191,17 @@ func (r *DbMigrationJobReconciler) createJobIfNeeded(job *jobv1.DbMigrationJob, 
 	}
 
 	serviceConfig, err := r.getServiceConfig(ctx, job.Namespace, job.Spec.ServiceName)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
 	logger.V(0).Info("Creating job")
 	batchJob, err := r.createJob(ctx, job, serviceConfig)
-	if nil != err {
+	if err != nil {
 		return false, nil
 	}
 
-	if err := r.Create(ctx, batchJob); nil != err {
+	if err := r.Create(ctx, batchJob); err != nil {
 		return false, err
 	}
 
@@ -217,7 +217,7 @@ func (r *DbMigrationJobReconciler) getServiceConfig(
 	name string,
 ) (*configv1.ServiceConfig, error) {
 	var config configv1.ServiceConfig
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); nil != err {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); err != nil {
 		return nil, err
 	}
 
@@ -230,7 +230,7 @@ func (r *DbMigrationJobReconciler) getOwnedMigrationJobs(
 ) (*batchv1.JobList, error) {
 	var jobList batchv1.JobList
 	labelMatcher := client.MatchingLabels{labels.JobName: job.Name, labels.Type: "dbmigration"}
-	if err := r.List(ctx, &jobList, client.InNamespace(job.Namespace), labelMatcher); nil != err {
+	if err := r.List(ctx, &jobList, client.InNamespace(job.Namespace), labelMatcher); err != nil {
 		return nil, err
 	}
 
@@ -242,13 +242,13 @@ func (r *DbMigrationJobReconciler) createJob(
 	job *jobv1.DbMigrationJob,
 	serviceConfig *configv1.ServiceConfig,
 ) (*batchv1.Job, error) {
-	if nil == serviceConfig.Spec.MigrationJobPodSpec {
+	if serviceConfig.Spec.MigrationJobPodSpec == nil {
 		return nil, errors.New("no migration pod spec specified in the service config")
 	}
 
 	var site sitev1.StagingSite
 	err := r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: job.Spec.SiteName}, &site)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -263,12 +263,12 @@ func (r *DbMigrationJobReconciler) createJob(
 	}
 	templateHandler := template.NewSite(site, *serviceConfig)
 	err = template.LoadConfigs(&templateHandler, ctx, r)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
 	podSpec, err := helpers.ReplaceTemplateVariablesInPodSpec(*serviceConfig.Spec.MigrationJobPodSpec, &templateHandler)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -295,7 +295,7 @@ func (r *DbMigrationJobReconciler) createJob(
 		},
 	}
 
-	if err = ctrl.SetControllerReference(job, batchJob, r.Scheme); nil != err {
+	if err = ctrl.SetControllerReference(job, batchJob, r.Scheme); err != nil {
 		return nil, err
 	}
 

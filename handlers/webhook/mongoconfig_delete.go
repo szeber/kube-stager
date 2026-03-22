@@ -28,7 +28,7 @@ func (r *MongoConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 		client.InNamespace(req.Namespace),
 		client.MatchingLabels{labels.MongoEnvironmentsPrefix + req.Name: "true"},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
@@ -53,7 +53,7 @@ func (r *MongoConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 		client.InNamespace(req.Namespace),
 		client.MatchingFields{indexes.DefaultMongoEnvironment: req.Name},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 

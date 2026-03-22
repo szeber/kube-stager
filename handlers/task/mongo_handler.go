@@ -26,7 +26,7 @@ func (r MongoTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 
 	var list taskv1.MongoDatabaseList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -43,11 +43,11 @@ func (r MongoTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 		}
 		var serviceConfig configv1.ServiceConfig
 		err = r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, &serviceConfig)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 		databasesToCreate[name], err = r.getPopulatedDatabase(site, &serviceConfig, service.MongoEnvironment)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 	}
@@ -70,19 +70,19 @@ func (r MongoTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 
 	for serviceName, database := range databasesToDelete {
 		logger.V(1).Info("Deleting mongo for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &database); nil != err {
+		if err = r.Writer.Delete(ctx, &database); err != nil {
 			return isComplete, err
 		}
 	}
 	for serviceName, database := range databasesToCreate {
 		logger.V(1).Info("Creating mongo for service " + serviceName)
-		if err = r.Writer.Create(ctx, &database); nil != err {
+		if err = r.Writer.Create(ctx, &database); err != nil {
 			return isComplete, err
 		}
 	}
 	for serviceName, database := range databasesToUpdate {
 		logger.V(1).Info("Updating mongo for service " + serviceName)
-		if err = r.Writer.Update(ctx, &database); nil != err {
+		if err = r.Writer.Update(ctx, &database); err != nil {
 			return isComplete, err
 		}
 	}
@@ -99,7 +99,7 @@ func (r MongoTaskHandler) EnsureDatabasesAreReady(site *sitev1.StagingSite, ctx 
 
 	var list taskv1.MongoDatabaseList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	logger.V(1).Info("Retrieved list.", "count", len(list.Items))
@@ -132,11 +132,11 @@ func (r MongoTaskHandler) getPopulatedDatabase(
 	environmentName string,
 ) (taskv1.MongoDatabase, error) {
 	database := taskv1.MongoDatabase{}
-	if err := database.PopulateFomSite(site, config, environmentName); nil != err {
+	if err := database.PopulateFomSite(site, config, environmentName); err != nil {
 		return database, err
 	}
 
-	if err := ctrl.SetControllerReference(site, &database, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, &database, r.Scheme); err != nil {
 		return database, err
 	}
 

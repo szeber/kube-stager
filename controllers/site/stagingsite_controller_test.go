@@ -523,7 +523,7 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(fetched.Status.Enabled).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
-			testClock.SetNow(fetched.Status.DisableAt.Time.Add(1 * time.Minute))
+			testClock.SetNow(fetched.Status.DisableAt.Add(1 * time.Minute))
 
 			// envtest won't re-enqueue after the deadline passes, so write an annotation to force reconciliation
 			Eventually(func(g Gomega) {
@@ -576,7 +576,7 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(fetched.Status.DeleteAt).NotTo(BeNil())
 			}, timeout, interval).Should(Succeed())
 
-			testClock.SetNow(fetched.Status.DeleteAt.Time.Add(1 * time.Minute))
+			testClock.SetNow(fetched.Status.DeleteAt.Add(1 * time.Minute))
 
 			// envtest won't re-enqueue after the deadline passes, so write an annotation to force reconciliation
 			Eventually(func(g Gomega) {
@@ -859,7 +859,7 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(fetched.Status.NextBackupTime).NotTo(BeNil())
 			}, 30*time.Second, interval).Should(Succeed())
 
-			testClock.SetNow(fetched.Status.NextBackupTime.Time.Add(1 * time.Minute))
+			testClock.SetNow(fetched.Status.NextBackupTime.Add(1 * time.Minute))
 
 			// envtest won't re-enqueue after the deadline passes, so write an annotation to force reconciliation
 			Eventually(func(g Gomega) {

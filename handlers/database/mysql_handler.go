@@ -44,7 +44,7 @@ func ReconcileMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.Mysq
 		return false, err
 	}
 
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 
 	logger.Info("Connected")
 
@@ -58,7 +58,7 @@ func ReconcileMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.Mysq
 		database:   database.Spec.DatabaseName,
 	}
 
-	if err := task.reconcileTask(); nil != err {
+	if err := task.reconcileTask(); err != nil {
 		return false, err
 	}
 
@@ -88,7 +88,7 @@ func DeleteMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.MysqlCo
 		return err
 	}
 
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 
 	logger.Info("Connected")
 
@@ -106,15 +106,15 @@ func DeleteMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.MysqlCo
 func (r *mysqlReconcileTask) reconcileTask() error {
 	r.logger.Info("Reconciling task")
 
-	if err := r.reconcileUser(); nil != err {
+	if err := r.reconcileUser(); err != nil {
 		return err
 	}
 
-	if err := r.reconcileDatabase(); nil != err {
+	if err := r.reconcileDatabase(); err != nil {
 		return err
 	}
 
-	if err := r.reconcilePermissions(); nil != err {
+	if err := r.reconcilePermissions(); err != nil {
 		return err
 	}
 
@@ -126,15 +126,15 @@ func (r *mysqlReconcileTask) reconcileTask() error {
 func (r *mysqlReconcileTask) deleteTask() error {
 	r.logger.Info("Deleting task")
 
-	if err := r.removeUser(); nil != err {
+	if err := r.removeUser(); err != nil {
 		return err
 	}
 
-	if err := r.revokePermissions(); nil != err {
+	if err := r.revokePermissions(); err != nil {
 		return err
 	}
 
-	if err := r.removeDatabase(); nil != err {
+	if err := r.removeDatabase(); err != nil {
 		return err
 	}
 
@@ -163,7 +163,7 @@ func (r *mysqlReconcileTask) reconcileUser() error {
 		} else {
 			r.logger.Info("the mysql password is incorrect for the user, changing password")
 
-			if err := r.changePassword(); nil != err {
+			if err := r.changePassword(); err != nil {
 				return err
 			}
 
@@ -172,7 +172,7 @@ func (r *mysqlReconcileTask) reconcileUser() error {
 	} else {
 		r.logger.Info("mysql user does not exist, creating it")
 
-		if err := r.createUser(); nil != err {
+		if err := r.createUser(); err != nil {
 			return err
 		}
 
@@ -212,7 +212,7 @@ func (r *mysqlReconcileTask) reconcileDatabase() error {
 func (r *mysqlReconcileTask) reconcilePermissions() error {
 	havePerms, err := r.revokeNotRequestedPermissions()
 
-	if nil != err {
+	if err != nil {
 		return nil
 	}
 
@@ -242,7 +242,7 @@ func (r *mysqlReconcileTask) getDatabasesWhereUserHasPermissions() ([]string, er
 		return dbNames, err
 	}
 
-	defer result.Close()
+	defer func() { _ = result.Close() }()
 
 	var dbName string
 
@@ -254,7 +254,7 @@ func (r *mysqlReconcileTask) getDatabasesWhereUserHasPermissions() ([]string, er
 }
 
 func (r *mysqlReconcileTask) revokePermissionOnDatabase(dbName string) error {
-	if "" == dbName {
+	if dbName == "" {
 		return nil
 	}
 
@@ -272,7 +272,7 @@ func (r *mysqlReconcileTask) revokeNotRequestedPermissions() (bool, error) {
 	hasPermissionsOnTaskDatabase := false
 	dbNames, err := r.getDatabasesWhereUserHasPermissions()
 
-	if nil != err {
+	if err != nil {
 		return hasPermissionsOnTaskDatabase, err
 	}
 
@@ -280,7 +280,7 @@ func (r *mysqlReconcileTask) revokeNotRequestedPermissions() (bool, error) {
 		if dbName == r.database {
 			hasPermissionsOnTaskDatabase = true
 		} else {
-			if err = r.revokePermissionOnDatabase(dbName); nil != err {
+			if err = r.revokePermissionOnDatabase(dbName); err != nil {
 				return hasPermissionsOnTaskDatabase, err
 			}
 		}
@@ -292,7 +292,7 @@ func (r *mysqlReconcileTask) revokeNotRequestedPermissions() (bool, error) {
 func (r *mysqlReconcileTask) createUser() error {
 	_, err := r.connection.Query(fmt.Sprintf("CREATE USER '%s'@'%%' IDENTIFIED BY '%s'", r.username, r.password))
 
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
@@ -318,7 +318,7 @@ func (r *mysqlReconcileTask) getUser(user *mysqlUserResult) error {
 func (r *mysqlReconcileTask) changePassword() error {
 	_, err := r.connection.Query(fmt.Sprintf("ALTER USER '%s'@'%%' IDENTIFIED BY '%s'", r.username, r.password))
 
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
@@ -337,12 +337,12 @@ func (r *mysqlReconcileTask) removeDatabase() error {
 func (r *mysqlReconcileTask) revokePermissions() error {
 	dbNames, err := r.getDatabasesWhereUserHasPermissions()
 
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
 	for _, dbName := range dbNames {
-		if err := r.revokePermissionOnDatabase(dbName); nil != err {
+		if err := r.revokePermissionOnDatabase(dbName); err != nil {
 			return err
 		}
 	}
@@ -361,5 +361,5 @@ func (r *mysqlReconcileTask) checkUserCanLogin() bool {
 
 	_, err := sql.Open("mysql", dataSourceName)
 
-	return nil == err
+	return err == nil
 }

@@ -27,7 +27,7 @@ func (r RedisTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 
 	var list taskv1.RedisDatabaseList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -44,11 +44,11 @@ func (r RedisTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 		}
 		var serviceConfig configv1.ServiceConfig
 		err = r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, &serviceConfig)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 		databasesToCreate[name], err = r.getPopulatedDatabase(site, &serviceConfig, service.RedisEnvironment)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 	}
@@ -64,7 +64,7 @@ func (r RedisTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 					site.Namespace,
 					database.Spec.EnvironmentConfig,
 				)
-				if nil != err {
+				if err != nil {
 					return false, err
 				}
 				databasesToUpdate[serviceName] = database
@@ -79,7 +79,7 @@ func (r RedisTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 
 	for serviceName, database := range databasesToDelete {
 		logger.V(1).Info("Deleting redis for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &database); nil != err {
+		if err = r.Writer.Delete(ctx, &database); err != nil {
 			return isComplete, err
 		}
 	}
@@ -89,10 +89,10 @@ func (r RedisTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 			ctx,
 			site.Namespace,
 			database.Spec.EnvironmentConfig,
-		); nil != err {
+		); err != nil {
 			return isComplete, err
 		}
-		if err = r.Writer.Create(ctx, &database); nil != err {
+		if err = r.Writer.Create(ctx, &database); err != nil {
 			return isComplete, err
 		}
 		service := site.Status.Services[serviceName]
@@ -101,7 +101,7 @@ func (r RedisTaskHandler) EnsureDatabasesAreCreated(site *sitev1.StagingSite, ct
 	}
 	for serviceName, database := range databasesToUpdate {
 		logger.V(1).Info("Updating redis for service " + serviceName)
-		if err = r.Writer.Update(ctx, &database); nil != err {
+		if err = r.Writer.Update(ctx, &database); err != nil {
 			return isComplete, err
 		}
 		service := site.Status.Services[serviceName]
@@ -122,7 +122,7 @@ func (r RedisTaskHandler) EnsureDatabasesAreReady(site *sitev1.StagingSite, ctx 
 
 	var list taskv1.RedisDatabaseList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	logger.V(1).Info(fmt.Sprintf("Retrieved list. Count: %d", len(list.Items)))
@@ -155,11 +155,11 @@ func (r RedisTaskHandler) getPopulatedDatabase(
 	environmentName string,
 ) (taskv1.RedisDatabase, error) {
 	database := taskv1.RedisDatabase{}
-	if err := database.PopulateFomSite(site, config, environmentName); nil != err {
+	if err := database.PopulateFomSite(site, config, environmentName); err != nil {
 		return database, err
 	}
 
-	if err := ctrl.SetControllerReference(site, &database, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, &database, r.Scheme); err != nil {
 		return database, err
 	}
 
@@ -182,7 +182,7 @@ func (r RedisTaskHandler) getFirstFreeDatabaseInEnvironment(
 		ctx,
 		client.ObjectKey{Namespace: namespace, Name: environmentConfig.Environment},
 		&redisConfig,
-	); nil != err {
+	); err != nil {
 		return 0, err
 	}
 
@@ -200,7 +200,7 @@ func (r RedisTaskHandler) getFirstFreeDatabaseInEnvironment(
 		&list,
 		client.InNamespace(namespace),
 		client.MatchingLabels{labels.RedisEnvironment: environmentConfig.Environment},
-	); nil != err {
+	); err != nil {
 		return 0, err
 	}
 

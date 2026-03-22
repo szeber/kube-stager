@@ -26,7 +26,7 @@ func (r *ServiceConfigDeleteHandler) Handle(ctx context.Context, req admission.R
 		client.InNamespace(req.Namespace),
 		client.MatchingLabels{labels.ServicesPrefix + req.Name: "true"},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 

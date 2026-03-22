@@ -19,7 +19,7 @@ func TestSaveStatusUpdatesIfObjectChanged(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if result.Requeue {
+		if result != (ctrl.Result{}) {
 			t.Error("should not requeue")
 		}
 	})
@@ -32,7 +32,7 @@ func TestSaveStatusUpdatesIfObjectChanged(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if result.Requeue {
+		if result != (ctrl.Result{}) {
 			t.Error("should not requeue")
 		}
 	})

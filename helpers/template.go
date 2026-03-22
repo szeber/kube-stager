@@ -25,7 +25,7 @@ func (r StringMapTemplateValueGetter) GetTemplateValues() map[string]string {
 func ReplaceTemplateVariablesInString(s string, templates ...TemplateValueGetter) string {
 	for _, i := range templates {
 		for name, value := range i.GetTemplateValues() {
-			s = strings.Replace(s, fmt.Sprintf("${%s}", name), value, -1)
+			s = strings.ReplaceAll(s, fmt.Sprintf("${%s}", name), value)
 		}
 	}
 
@@ -35,7 +35,7 @@ func ReplaceTemplateVariablesInString(s string, templates ...TemplateValueGetter
 func GetTemplateVariables(templates ...TemplateValueGetter) []string {
 	result := []string{}
 	for _, i := range templates {
-		for name, _ := range i.GetTemplateValues() {
+		for name := range i.GetTemplateValues() {
 			result = append(result, name)
 		}
 	}
@@ -85,7 +85,7 @@ func ReplaceTemplateVariablesInPodSpec(spec corev1.PodSpec, templates ...Templat
 	pod := corev1.Pod{Spec: spec}
 
 	data, err := yaml.Marshal(pod)
-	if nil != err {
+	if err != nil {
 		return spec, err
 	}
 
@@ -101,7 +101,7 @@ func ReplaceTemplateVariablesInPodSpec(spec corev1.PodSpec, templates ...Templat
 	}
 
 	err = yaml.Unmarshal([]byte(replacedMarshalledSpec), &pod)
-	if nil != err {
+	if err != nil {
 		return spec, err
 	}
 
@@ -115,7 +115,7 @@ func ReplaceTemplateVariablesInServiceSpec(
 	service := corev1.Service{Spec: spec}
 
 	data, err := yaml.Marshal(service)
-	if nil != err {
+	if err != nil {
 		return spec, err
 	}
 
@@ -131,7 +131,7 @@ func ReplaceTemplateVariablesInServiceSpec(
 	}
 
 	err = yaml.Unmarshal([]byte(replacedMarshalledSpec), &service)
-	if nil != err {
+	if err != nil {
 		return spec, err
 	}
 
@@ -145,7 +145,7 @@ func ReplaceTemplateVariablesInIngressSpec(
 	ingress := networkingv1.Ingress{Spec: spec}
 
 	data, err := yaml.Marshal(ingress)
-	if nil != err {
+	if err != nil {
 		return spec, err
 	}
 
@@ -161,7 +161,7 @@ func ReplaceTemplateVariablesInIngressSpec(
 	}
 
 	err = yaml.Unmarshal([]byte(replacedMarshalledSpec), &ingress)
-	if nil != err {
+	if err != nil {
 		return spec, err
 	}
 

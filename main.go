@@ -192,7 +192,7 @@ func main() {
 
 	setupLog.Info("Using config", "config", ctrlConfig)
 
-	if "" != ctrlConfig.SentryDsn {
+	if ctrlConfig.SentryDsn != "" {
 		err = sentry.Init(
 			sentry.ClientOptions{
 				Dsn: ctrlConfig.SentryDsn,

@@ -49,7 +49,7 @@ type RedisDatabaseReconciler struct {
 func (r *RedisDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
 		sentry.CaptureException(err)
 	}
 
@@ -61,7 +61,7 @@ func (r *RedisDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 	var db taskv1.RedisDatabase
 
-	if err := r.Get(ctx, req.NamespacedName, &db); nil != err {
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "unable to fetch database")
 		}
@@ -74,7 +74,7 @@ func (r *RedisDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	var config configv1.RedisConfig
 
 	configKey := client.ObjectKey{Namespace: db.Namespace, Name: db.Spec.EnvironmentConfig.Environment}
-	if err := r.Get(ctx, configKey, &config); nil != err {
+	if err := r.Get(ctx, configKey, &config); err != nil {
 		return ctrl.Result{}, err
 	}
 

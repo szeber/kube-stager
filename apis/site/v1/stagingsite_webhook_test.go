@@ -50,7 +50,7 @@ func TestStagingSiteDefaulter_Default(t *testing.T) {
 		if err := d.Default(context.Background(), site); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if _, ok := site.ObjectMeta.Annotations[annotations.StagingSiteLastSpecChangeAt]; !ok {
+		if _, ok := site.Annotations[annotations.StagingSiteLastSpecChangeAt]; !ok {
 			t.Error("LastSpecChangeAt annotation should be set")
 		}
 	})

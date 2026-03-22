@@ -50,7 +50,7 @@ type MysqlDatabaseReconciler struct {
 func (r *MysqlDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
 		sentry.CaptureException(err)
 	}
 
@@ -62,7 +62,7 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 	var db taskv1.MysqlDatabase
 
-	if err := r.Get(ctx, req.NamespacedName, &db); nil != err {
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "unable to fetch database")
 		}
@@ -75,22 +75,22 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	var config configv1.MysqlConfig
 
 	configKey := client.ObjectKey{Namespace: db.Namespace, Name: db.Spec.EnvironmentConfig.Environment}
-	if err := r.Get(ctx, configKey, &config); nil != err {
+	if err := r.Get(ctx, configKey, &config); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	isDbChanged := false
 
-	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if err := r.DatabaseReconciler.Delete(&db, config, logger); nil != err {
+	if !db.DeletionTimestamp.IsZero() {
+		if err := r.DatabaseReconciler.Delete(&db, config, logger); err != nil {
 			return ctrl.Result{}, err
 		}
 
-		previousFinalizersLength := len(db.ObjectMeta.Finalizers)
-		db.ObjectMeta.Finalizers = helpers.RemoveStringFromSlice(db.ObjectMeta.Finalizers, helpers.MysqlFinalizerName)
+		previousFinalizersLength := len(db.Finalizers)
+		db.Finalizers = helpers.RemoveStringFromSlice(db.Finalizers, helpers.MysqlFinalizerName)
 
-		if len(db.ObjectMeta.Finalizers) != previousFinalizersLength {
-			if err := r.Update(ctx, &db); nil != err {
+		if len(db.Finalizers) != previousFinalizersLength {
+			if err := r.Update(ctx, &db); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -98,9 +98,9 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	if !helpers.SliceContainsString(db.ObjectMeta.Finalizers, helpers.MysqlFinalizerName) {
-		db.ObjectMeta.Finalizers = append(db.ObjectMeta.Finalizers, helpers.MysqlFinalizerName)
-		if err := r.Update(ctx, &db); nil != err {
+	if !helpers.SliceContainsString(db.Finalizers, helpers.MysqlFinalizerName) {
+		db.Finalizers = append(db.Finalizers, helpers.MysqlFinalizerName)
+		if err := r.Update(ctx, &db); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil

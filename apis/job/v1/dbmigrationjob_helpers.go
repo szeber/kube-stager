@@ -10,28 +10,24 @@ import (
 )
 
 func (r *DbMigrationJob) PopulateFomSite(site *sitev1.StagingSite, config *configv1.ServiceConfig) error {
-	if nil == config.Spec.MigrationJobPodSpec {
+	if config.Spec.MigrationJobPodSpec == nil {
 		return errors.New("no migration pod spec specified in the service config")
 	}
 	r.ObjectMeta = metav1.ObjectMeta{
-		Name:      helpers.ShortenHumanReadableValue(site.ObjectMeta.Name, 50) + "-" + config.Spec.ShortName,
-		Namespace: site.ObjectMeta.Namespace,
+		Name:      helpers.ShortenHumanReadableValue(site.Name, 50) + "-" + config.Spec.ShortName,
+		Namespace: site.Namespace,
 		Labels: map[string]string{
-			labels.Site:    site.ObjectMeta.Name,
-			labels.Service: config.ObjectMeta.Name,
+			labels.Site:    site.Name,
+			labels.Service: config.Name,
 		},
 		Annotations: map[string]string{},
 	}
 	r.Spec = DbMigrationJobSpec{
 		SiteName:        site.Name,
-		ServiceName:     config.ObjectMeta.Name,
+		ServiceName:     config.Name,
 		ImageTag:        site.Spec.Services[config.Name].ImageTag,
 		DeadlineSeconds: 600,
 	}
-	r.Name = r.ObjectMeta.Name
-	r.Namespace = r.ObjectMeta.Namespace
-	r.Labels = r.ObjectMeta.Labels
-	r.Annotations = r.ObjectMeta.Annotations
 
 	return nil
 }

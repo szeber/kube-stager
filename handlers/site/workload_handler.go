@@ -34,7 +34,7 @@ func (r WorkloadHandler) EnsureWorkloadObjectsAreUpToDate(site *sitev1.StagingSi
 	previousHealth := site.Status.WorkloadHealth
 	isComplete := true
 
-	if complete, err := r.ensureDeploymentsAreUpToDate(site, ctx); nil != err {
+	if complete, err := r.ensureDeploymentsAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isComplete = isComplete && complete
@@ -59,13 +59,13 @@ func (r WorkloadHandler) ensureDeploymentsAreUpToDate(site *sitev1.StagingSite, 
 			labels.Site: site.Name,
 		},
 	)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
 	if !site.Status.Enabled {
 		for _, service := range list.Items {
-			if err := r.Writer.Delete(ctx, &service); nil != err {
+			if err := r.Writer.Delete(ctx, &service); err != nil {
 				return false, err
 			}
 		}
@@ -78,11 +78,11 @@ func (r WorkloadHandler) ensureDeploymentsAreUpToDate(site *sitev1.StagingSite, 
 
 	for name := range site.Spec.Services {
 		config := &configv1.ServiceConfig{}
-		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); nil != err {
+		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); err != nil {
 			return false, err
 		}
 
-		if deployment, err := r.createDeployment(site, config, ctx); nil != err {
+		if deployment, err := r.createDeployment(site, config, ctx); err != nil {
 			return false, err
 		} else {
 			deploymentsToCreate[name] = *deployment
@@ -91,7 +91,7 @@ func (r WorkloadHandler) ensureDeploymentsAreUpToDate(site *sitev1.StagingSite, 
 
 	isEverythingHealthy := true
 	for _, existingDeployment := range list.Items {
-		serviceName := existingDeployment.ObjectMeta.Labels[labels.Service]
+		serviceName := existingDeployment.Labels[labels.Service]
 
 		if _, ok := deploymentsToCreate[serviceName]; ok {
 			patch := client.MergeFrom(existingDeployment.DeepCopy())
@@ -122,7 +122,7 @@ func (r WorkloadHandler) ensureDeploymentsAreUpToDate(site *sitev1.StagingSite, 
 
 	for serviceName, deployment := range deploymentsToDelete {
 		logger.V(1).Info("Deleting deployment for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &deployment); nil != err {
+		if err = r.Writer.Delete(ctx, &deployment); err != nil {
 			return false, err
 		}
 	}
@@ -132,13 +132,13 @@ func (r WorkloadHandler) ensureDeploymentsAreUpToDate(site *sitev1.StagingSite, 
 			ctx,
 			&deployment.existing,
 			deployment.patch,
-		); nil != err {
+		); err != nil {
 			return false, err
 		}
 	}
 	for serviceName, deployment := range deploymentsToCreate {
 		logger.V(1).Info("Creating deployment for service " + serviceName)
-		if err = r.Writer.Create(ctx, &deployment); nil != err {
+		if err = r.Writer.Create(ctx, &deployment); err != nil {
 			return false, err
 		}
 	}
@@ -155,7 +155,7 @@ func (r WorkloadHandler) createDeployment(
 ) (*appsv1.Deployment, error) {
 	templateHandler := template.NewSite(*site, *serviceConfig)
 	err := template.LoadConfigs(&templateHandler, ctx, r.Reader)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 	labelsMap := map[string]string{
@@ -169,7 +169,7 @@ func (r WorkloadHandler) createDeployment(
 	}
 
 	podSpec, err := helpers.ReplaceTemplateVariablesInPodSpec(serviceConfig.Spec.DeploymentPodSpec, &templateHandler)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -195,7 +195,7 @@ func (r WorkloadHandler) createDeployment(
 		},
 	}
 
-	if err := ctrl.SetControllerReference(site, deployment, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, deployment, r.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -203,8 +203,8 @@ func (r WorkloadHandler) createDeployment(
 }
 
 func (r WorkloadHandler) updateDeploymentFromOther(a *appsv1.Deployment, b appsv1.Deployment) {
-	a.ObjectMeta.Labels = b.ObjectMeta.Labels
-	a.Spec.Template.ObjectMeta.Labels = b.Spec.Template.ObjectMeta.Labels
+	a.Labels = b.Labels
+	a.Spec.Template.Labels = b.Spec.Template.Labels
 	a.Spec.Template.Spec = b.Spec.Template.Spec
 	a.Spec.Replicas = b.Spec.Replicas
 }

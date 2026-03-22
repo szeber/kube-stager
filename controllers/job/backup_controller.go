@@ -52,7 +52,7 @@ type BackupReconciler struct {
 
 type realClock struct{}
 
-func (_ realClock) Now() time.Time {
+func (realClock) Now() time.Time {
 	return time.Now()
 }
 
@@ -72,7 +72,7 @@ type Clock interface {
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
 		sentry.CaptureException(err)
 	}
 
@@ -112,12 +112,12 @@ func (r *BackupReconciler) doReconcile(ctx context.Context, req ctrl.Request) (c
 func (r *BackupReconciler) ensureStatusIsInitialised(backup *jobv1.Backup) bool {
 	changed := false
 
-	if "" == backup.Status.State {
+	if backup.Status.State == "" {
 		backup.Status.State = jobv1.Pending
 		changed = true
 	}
 
-	if 0 == len(backup.Status.Services) {
+	if len(backup.Status.Services) == 0 {
 		backup.Status.Services = map[string]jobv1.BackupStatusDetail{}
 	}
 
@@ -129,7 +129,7 @@ func (r *BackupReconciler) ensureJobsAreUpToDate(ctx context.Context, job *jobv1
 
 	logger.V(1).Info("Loading site")
 	site := &sitev1.StagingSite{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: job.Spec.SiteName}, site); nil != err {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: job.Spec.SiteName}, site); err != nil {
 		return false, err
 	}
 
@@ -141,9 +141,9 @@ func (r *BackupReconciler) ensureJobsAreUpToDate(ctx context.Context, job *jobv1
 	if len(services) == 0 {
 		logger.V(0).Info("No backups are required as there are no services with backups enabled in the site")
 		job.Status.State = jobv1.Complete
-		_ = r.updateJobStartedAtIfNeeded(job, r.Clock.Now())
-		if nil == job.Status.JobFinishedAt {
-			t := metav1.NewTime(r.Clock.Now())
+		_ = r.updateJobStartedAtIfNeeded(job, r.Now())
+		if job.Status.JobFinishedAt == nil {
+			t := metav1.NewTime(r.Now())
 			job.Status.JobFinishedAt = &t
 		}
 
@@ -158,13 +158,13 @@ func (r *BackupReconciler) ensureJobsAreUpToDate(ctx context.Context, job *jobv1
 		site,
 		logger,
 	)
-	if nil != err {
+	if err != nil {
 		return isChanged, err
 	}
 
 	if jobv1.Failed != job.Status.State && allServicesFinished {
 		job.Status.State = jobv1.Complete
-		if nil != lastFinishedAt {
+		if lastFinishedAt != nil {
 			job.Status.JobFinishedAt = &metav1.Time{Time: *lastFinishedAt}
 		}
 		isChanged = true
@@ -194,7 +194,7 @@ func (r *BackupReconciler) processServiceInJob(
 				job.Status.State = jobv1.Failed
 				isChanged = true
 			} else if jobv1.Complete == serviceStatus.State {
-				if nil == lastFinishedAt || lastFinishedAt.Before(serviceStatus.JobFinishedAt.Time) {
+				if lastFinishedAt == nil || lastFinishedAt.Before(serviceStatus.JobFinishedAt.Time) {
 					lastFinishedAt = &serviceStatus.JobFinishedAt.Time
 					isChanged = true
 				}
@@ -207,15 +207,15 @@ func (r *BackupReconciler) processServiceInJob(
 			ctx,
 			client.ObjectKey{Namespace: job.Namespace, Name: batchJobName},
 			batchJob,
-		); nil != client.IgnoreNotFound(err) {
+		); client.IgnoreNotFound(err) != nil {
 			return isChanged, false, lastFinishedAt, err
-		} else if nil != err {
+		} else if err != nil {
 			batchJob, err = r.getNewBackupJob(ctx, job, *site, service)
-			if nil != err {
+			if err != nil {
 				return isChanged, false, lastFinishedAt, err
 			}
 
-			now := r.Clock.Now()
+			now := r.Now()
 			isChanged = true
 			_ = r.updateJobStartedAtIfNeeded(job, now)
 			allServicesFinished = false
@@ -224,7 +224,7 @@ func (r *BackupReconciler) processServiceInJob(
 			serviceStatus.JobFinishedAt = nil
 			serviceStatus.State = jobv1.Running
 
-			if err := r.Create(ctx, batchJob); nil != err {
+			if err := r.Create(ctx, batchJob); err != nil {
 				return isChanged, false, lastFinishedAt, err
 			}
 		} else {
@@ -237,7 +237,7 @@ func (r *BackupReconciler) processServiceInJob(
 					logger.V(0).Info("Job finished successfully")
 					serviceStatus.State = jobv1.Complete
 					serviceStatus.JobFinishedAt = &v.LastTransitionTime
-					if nil == lastFinishedAt || lastFinishedAt.Before(v.LastTransitionTime.Time) {
+					if lastFinishedAt == nil || lastFinishedAt.Before(v.LastTransitionTime.Time) {
 						lastFinishedAt = &v.LastTransitionTime.Time
 					}
 					isChanged = true
@@ -273,13 +273,13 @@ func (r *BackupReconciler) loadServicesForSite(
 
 	for name := range site.Status.Services {
 		service := &configv1.ServiceConfig{}
-		if err := r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: name}, service); nil != err {
+		if err := r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: name}, service); err != nil {
 			return nil, isChanged, err
 		}
-		if nil == service.Spec.BackupPodSpec {
+		if service.Spec.BackupPodSpec == nil {
 			continue
 		}
-		if "" == job.Status.Services[name].State {
+		if job.Status.Services[name].State == "" {
 			serviceState := job.Status.Services[name]
 			serviceState.State = jobv1.Pending
 			job.Status.Services[name] = serviceState
@@ -293,7 +293,7 @@ func (r *BackupReconciler) loadServicesForSite(
 }
 
 func (r *BackupReconciler) updateJobStartedAtIfNeeded(job *jobv1.Backup, currentStartedAt time.Time) bool {
-	if nil == job.Status.JobStartedAt || job.Status.JobStartedAt.Time.After(currentStartedAt) {
+	if job.Status.JobStartedAt == nil || job.Status.JobStartedAt.After(currentStartedAt) {
 		job.Status.JobStartedAt = &metav1.Time{Time: currentStartedAt}
 		return true
 	}
@@ -322,12 +322,12 @@ func (r *BackupReconciler) getNewBackupJob(
 	}
 	templateHandler := template.NewSite(site, serviceConfig)
 	err := template.LoadConfigs(&templateHandler, ctx, r)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
 	podSpec, err := helpers.ReplaceTemplateVariablesInPodSpec(*serviceConfig.Spec.BackupPodSpec, &templateHandler)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -354,7 +354,7 @@ func (r *BackupReconciler) getNewBackupJob(
 		},
 	}
 
-	if err = ctrl.SetControllerReference(job, batchJob, r.Scheme); nil != err {
+	if err = ctrl.SetControllerReference(job, batchJob, r.Scheme); err != nil {
 		return nil, err
 	}
 
