@@ -25,12 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	configv1 "github.com/szeber/kube-stager/apis/config/v1"
-	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
-	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
-	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
 	"github.com/szeber/kube-stager/internal/testutil"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,18 +72,11 @@ var _ = BeforeSuite(
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg).NotTo(BeNil())
 
-		err = configv1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
-		err = jobv1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
-		err = sitev1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
-		err = taskv1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
+		testScheme := testutil.NewTestScheme()
 
 		//+kubebuilder:scaffold:scheme
 
-		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(k8sClient).NotTo(BeNil())
 
@@ -96,7 +84,7 @@ var _ = BeforeSuite(
 		testClock.SetNow(time.Now())
 
 		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: scheme.Scheme,
+			Scheme: testScheme,
 		})
 		Expect(err).NotTo(HaveOccurred())
 

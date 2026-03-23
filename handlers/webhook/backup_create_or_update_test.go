@@ -14,8 +14,12 @@ import (
 	"github.com/szeber/kube-stager/internal/testutil"
 )
 
-func makeBackupAdmissionRequest(backup *jobv1.Backup) admission.Request {
-	raw, _ := json.Marshal(backup)
+func makeBackupAdmissionRequest(t *testing.T, backup *jobv1.Backup) admission.Request {
+	t.Helper()
+	raw, err := json.Marshal(backup)
+	if err != nil {
+		t.Fatalf("failed to marshal Backup: %v", err)
+	}
 	return admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
 			Object:    runtime.RawExtension{Raw: raw},
@@ -38,7 +42,7 @@ func TestBackupCreateOrUpdateHandler_ValidBackupWithExistingSite(t *testing.T) {
 		Decoder: admission.NewDecoder(testutil.NewTestScheme()),
 	}
 
-	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(backup))
+	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(t, backup))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed for backup with existing site, got Denied: %v", resp.Result)
@@ -63,7 +67,7 @@ func TestBackupCreateOrUpdateHandler_SiteNotFound(t *testing.T) {
 		Decoder: admission.NewDecoder(testutil.NewTestScheme()),
 	}
 
-	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(backup))
+	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(t, backup))
 
 	if resp.Allowed {
 		t.Error("expected Denied when site does not exist, got Allowed")
@@ -86,7 +90,7 @@ func TestBackupCreateOrUpdateHandler_ScheduledBackupWithExistingSite(t *testing.
 		Decoder: admission.NewDecoder(testutil.NewTestScheme()),
 	}
 
-	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(backup))
+	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(t, backup))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed for scheduled backup with existing site, got Denied: %v", resp.Result)
@@ -106,7 +110,7 @@ func TestBackupCreateOrUpdateHandler_FinalBackupWithExistingSite(t *testing.T) {
 		Decoder: admission.NewDecoder(testutil.NewTestScheme()),
 	}
 
-	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(backup))
+	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(t, backup))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed for final backup with existing site, got Denied: %v", resp.Result)
@@ -128,7 +132,7 @@ func TestBackupCreateOrUpdateHandler_SiteInDifferentNamespaceNotFound(t *testing
 		Decoder: admission.NewDecoder(testutil.NewTestScheme()),
 	}
 
-	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(backup))
+	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(t, backup))
 
 	if resp.Allowed {
 		t.Error("expected Denied when site is in a different namespace, got Allowed")

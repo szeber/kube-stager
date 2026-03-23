@@ -712,7 +712,7 @@ func (r *StagingSiteReconciler) SaveStatusUpdatesIfObjectChanged(
 				err = nil
 			}
 		}
-		if sitev1.StateFailed == site.Status.State && !isChanged {
+		if site.Status.State == sitev1.StateFailed && !isChanged {
 			isChanged = true
 		}
 	}

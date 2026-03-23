@@ -15,8 +15,12 @@ import (
 	"github.com/szeber/kube-stager/internal/testutil"
 )
 
-func makeSiteAdmissionRequest(site *sitev1.StagingSite) admission.Request {
-	raw, _ := json.Marshal(site)
+func makeSiteAdmissionRequest(t *testing.T, site *sitev1.StagingSite) admission.Request {
+	t.Helper()
+	raw, err := json.Marshal(site)
+	if err != nil {
+		t.Fatalf("failed to marshal StagingSite: %v", err)
+	}
 	return admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
 			Object:    runtime.RawExtension{Raw: raw},
@@ -45,7 +49,7 @@ func TestStagingsiteHandler_ValidSiteWithAllConfigs(t *testing.T) {
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed, got Denied: %v", resp.Result)
@@ -66,7 +70,7 @@ func TestStagingsiteHandler_MissingServiceConfig(t *testing.T) {
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
 		t.Error("expected Denied, got Allowed")
@@ -94,7 +98,7 @@ func TestStagingsiteHandler_InvalidMysqlEnvironment(t *testing.T) {
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
 		t.Error("expected Denied due to missing mysql environment, got Allowed")
@@ -118,7 +122,7 @@ func TestStagingsiteHandler_IncludeAllServices(t *testing.T) {
 	site := testutil.NewTestStagingSite("mysite", ns, nil)
 	site.Spec.IncludeAllServices = true
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed when IncludeAllServices=true, got Denied: %v", resp.Result)
@@ -135,7 +139,7 @@ func TestStagingsiteHandler_EmptyServices(t *testing.T) {
 
 	site := testutil.NewTestStagingSite("mysite", ns, nil)
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
 		t.Error("expected Denied for empty services, got Allowed")
@@ -161,7 +165,7 @@ func TestStagingsiteHandler_DefaultsFilled(t *testing.T) {
 		"mysvc": {},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed with defaults filled, got Denied: %v", resp.Result)
@@ -190,7 +194,7 @@ func TestStagingsiteHandler_DefaultMysqlEnvironmentFromServiceConfig(t *testing.
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed (default mysql env from service config), got Denied: %v", resp.Result)
@@ -215,7 +219,7 @@ func TestStagingsiteHandler_InvalidMongoEnvironment(t *testing.T) {
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
 		t.Error("expected Denied due to missing mongo environment, got Allowed")
@@ -240,7 +244,7 @@ func TestStagingsiteHandler_InvalidRedisEnvironment(t *testing.T) {
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
 		t.Error("expected Denied due to missing redis environment, got Allowed")
@@ -269,7 +273,7 @@ func TestStagingsiteHandler_AllEnvironmentLabelsSet(t *testing.T) {
 		},
 	})
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed with all environments valid, got Denied: %v", resp.Result)
@@ -308,7 +312,7 @@ func TestStagingsiteHandler_ExistingLabelsPreserved(t *testing.T) {
 		},
 	}
 
-	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(site))
+	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if !resp.Allowed {
 		t.Errorf("expected Allowed, got Denied: %v", resp.Result)

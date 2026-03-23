@@ -313,7 +313,12 @@ var _ = Describe("DbMigrationJobController", func() {
 				g.Expect(fetched.Status.State).To(Equal(jobv1.Running))
 			}, timeout, interval).Should(Succeed())
 
-			time.Sleep(2 * time.Second)
+			// Set the deadline timestamp to the past so the next reconciliation sees it as expired
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(job), fetched)).To(Succeed())
+				fetched.Status.DeadlineTimestamp = &metav1.Time{Time: time.Now().Add(-1 * time.Second)}
+				g.Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
 
 			// envtest won't re-enqueue after the deadline passes, so write an annotation to force reconciliation
 			Eventually(func(g Gomega) {

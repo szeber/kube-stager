@@ -221,8 +221,7 @@ func (r *mysqlReconcileTask) reconcilePermissions() error {
 		_, err = r.connection.Exec(fmt.Sprintf("GRANT ALL ON `%s`.* TO '%s'@'%%'", r.database, r.username))
 
 		if err != nil {
-			panic(err)
-			//return err
+			return err
 		}
 	}
 
@@ -247,6 +246,9 @@ func (r *mysqlReconcileTask) getDatabasesWhereUserHasPermissions() ([]string, er
 	var dbName string
 
 	for result.Next() {
+		if err := result.Scan(&dbName); err != nil {
+			return dbNames, err
+		}
 		dbNames = append(dbNames, dbName)
 	}
 
@@ -359,7 +361,11 @@ func (r *mysqlReconcileTask) checkUserCanLogin() bool {
 		r.port,
 	)
 
-	_, err := sql.Open("mysql", dataSourceName)
+	connection, err := sql.Open("mysql", dataSourceName)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = connection.Close() }()
 
-	return err == nil
+	return connection.Ping() == nil
 }

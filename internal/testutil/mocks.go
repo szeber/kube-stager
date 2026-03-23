@@ -7,7 +7,12 @@ import (
 	"github.com/go-logr/logr"
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
+	"github.com/szeber/kube-stager/handlers/database"
 )
+
+var _ database.MysqlReconciler = (*MockMysqlReconciler)(nil)
+var _ database.MongoReconciler = (*MockMongoReconciler)(nil)
+var _ database.RedisReconciler = (*MockRedisReconciler)(nil)
 
 type MockClock struct {
 	mu  sync.Mutex
