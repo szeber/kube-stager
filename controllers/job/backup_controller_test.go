@@ -461,15 +461,27 @@ var _ = Describe("BackupController", func() {
 				g.Expect(batchJobs.Items).NotTo(BeEmpty())
 			}, timeout, interval).Should(Succeed())
 
-			// Simulate batch Job failure by setting the Failed condition
+			// Simulate batch Job failure by setting the Failed condition.
+			// K8s 1.35+ requires startTime on finished jobs and FailureTarget before Failed.
 			batchJob := &batchJobs.Items[0]
-			batchJob.Status.Conditions = append(batchJob.Status.Conditions, batchv1.JobCondition{
-				Type:               batchv1.JobFailed,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "BackoffLimitExceeded",
-				Message:            "Job has reached the specified backoff limit",
-			})
+			now := metav1.Now()
+			batchJob.Status.StartTime = &now
+			batchJob.Status.Conditions = append(batchJob.Status.Conditions,
+				batchv1.JobCondition{
+					Type:               batchv1.JobFailureTarget,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: now,
+					Reason:             "BackoffLimitExceeded",
+					Message:            "Job has reached the specified backoff limit",
+				},
+				batchv1.JobCondition{
+					Type:               batchv1.JobFailed,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: now,
+					Reason:             "BackoffLimitExceeded",
+					Message:            "Job has reached the specified backoff limit",
+				},
+			)
 			Expect(k8sClient.Status().Update(ctx, batchJob)).To(Succeed())
 
 			// Force re-reconciliation by touching the backup
