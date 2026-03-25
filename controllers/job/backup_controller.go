@@ -29,6 +29,7 @@ import (
 	"github.com/szeber/kube-stager/helpers"
 	"github.com/szeber/kube-stager/helpers/labels"
 	"github.com/szeber/kube-stager/helpers/pod"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,6 +74,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, err := r.doReconcile(ctx, req)
 
 	if err != nil {
+		appmetrics.Errors.WithLabelValues("backup", "false").Inc()
 		sentry.CaptureException(err)
 	}
 
@@ -140,11 +142,16 @@ func (r *BackupReconciler) ensureJobsAreUpToDate(ctx context.Context, job *jobv1
 
 	if len(services) == 0 {
 		logger.V(0).Info("No backups are required as there are no services with backups enabled in the site")
+		previousState := job.Status.State
 		job.Status.State = jobv1.Complete
 		_ = r.updateJobStartedAtIfNeeded(job, r.Now())
 		if job.Status.JobFinishedAt == nil {
 			t := metav1.NewTime(r.Now())
 			job.Status.JobFinishedAt = &t
+		}
+		if previousState != jobv1.Complete {
+			appmetrics.JobCompletions.WithLabelValues("backup", "success").Inc()
+			appmetrics.BackupCompletions.WithLabelValues(job.Namespace, string(job.Spec.BackupType)).Inc()
 		}
 
 		return true, nil
@@ -163,11 +170,19 @@ func (r *BackupReconciler) ensureJobsAreUpToDate(ctx context.Context, job *jobv1
 	}
 
 	if job.Status.State != jobv1.Failed && allServicesFinished {
+		previousState := job.Status.State
 		job.Status.State = jobv1.Complete
 		if lastFinishedAt != nil {
 			job.Status.JobFinishedAt = &metav1.Time{Time: *lastFinishedAt}
 		}
 		isChanged = true
+		if previousState != jobv1.Complete {
+			appmetrics.JobCompletions.WithLabelValues("backup", "success").Inc()
+			appmetrics.BackupCompletions.WithLabelValues(job.Namespace, string(job.Spec.BackupType)).Inc()
+			if job.Status.JobStartedAt != nil && job.Status.JobFinishedAt != nil {
+				appmetrics.JobDuration.WithLabelValues("backup").Observe(job.Status.JobFinishedAt.Sub(job.Status.JobStartedAt.Time).Seconds())
+			}
+		}
 	}
 
 	return isChanged, nil
@@ -192,7 +207,10 @@ func (r *BackupReconciler) processServiceInJob(
 		if serviceStatus.State.IsFinal() {
 			switch serviceStatus.State {
 			case jobv1.Failed:
-				job.Status.State = jobv1.Failed
+				if job.Status.State != jobv1.Failed {
+					job.Status.State = jobv1.Failed
+					appmetrics.JobCompletions.WithLabelValues("backup", "failure").Inc()
+				}
 				isChanged = true
 			case jobv1.Complete:
 				if lastFinishedAt == nil || lastFinishedAt.Before(serviceStatus.JobFinishedAt.Time) {
@@ -248,7 +266,10 @@ func (r *BackupReconciler) processServiceInJob(
 
 				if v.Type == batchv1.JobFailed && v.Status == corev1.ConditionTrue {
 					logger.V(0).Info("Job failed", "status", v.Message, "reason", v.Reason)
-					job.Status.State = jobv1.Failed
+					if job.Status.State != jobv1.Failed {
+						job.Status.State = jobv1.Failed
+						appmetrics.JobCompletions.WithLabelValues("backup", "failure").Inc()
+					}
 					serviceStatus.State = jobv1.Failed
 					isChanged = true
 					break

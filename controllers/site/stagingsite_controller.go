@@ -34,6 +34,7 @@ import (
 	"github.com/szeber/kube-stager/helpers/annotations"
 	errorhelpers "github.com/szeber/kube-stager/helpers/errors"
 	"github.com/szeber/kube-stager/helpers/indexes"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"hash/fnv"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,6 +109,15 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	stateBeforeReconcile := site.Status.State
+	defer func() {
+		if stateBeforeReconcile != "" && site.Status.State != stateBeforeReconcile {
+			appmetrics.SiteStateTransitions.WithLabelValues(site.Namespace, string(stateBeforeReconcile), string(site.Status.State)).Inc()
+			if site.Status.State == sitev1.StateComplete && !site.CreationTimestamp.IsZero() {
+				appmetrics.SiteProvisioningDuration.WithLabelValues(site.Namespace).Observe(r.Now().Sub(site.CreationTimestamp.Time).Seconds())
+			}
+		}
+	}()
 	logger.V(0).Info("Fetched staging site " + site.Name)
 
 	if site.DeletionTimestamp != nil {
@@ -131,8 +141,11 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 	r.resetStatusErrors(site)
 
 	if site.Status.DeleteAt != nil && site.Status.DeleteAt.Time.Before(r.Now()) {
-		err := r.Delete(ctx, site)
-		return ctrl.Result{}, err
+		if err := r.Delete(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
+		appmetrics.SiteAutoDeleted.WithLabelValues(site.Namespace).Inc()
+		return ctrl.Result{}, nil
 	}
 
 	isSiteChanged := false
@@ -388,6 +401,9 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 	expectedEnabled := site.Spec.Enabled && (site.Status.DisableAt == nil || site.Status.DisableAt.After(r.Now()))
 
 	if site.Status.Enabled != expectedEnabled {
+		if site.Status.Enabled && !expectedEnabled && site.Spec.Enabled {
+			appmetrics.SiteAutoDisabled.WithLabelValues(site.Namespace).Inc()
+		}
 		site.Status.Enabled = expectedEnabled
 		site.Status.State = sitev1.StatePending
 		isChanged = true
@@ -705,12 +721,17 @@ func (r *StagingSiteReconciler) SaveStatusUpdatesIfObjectChanged(
 		if errors.As(err, &controllerError) {
 			if controllerError.IsFinal() {
 				log.FromContext(ctx).Error(controllerError, "Received final controller error. Failing site")
+				appmetrics.Errors.WithLabelValues("stagingsite", "true").Inc()
 				site.Status.State = sitev1.StateFailed
 				site.Status.ErrorMessage = err.Error()
 				isChanged = true
 				result = ctrl.Result{}
 				err = nil
+			} else {
+				appmetrics.Errors.WithLabelValues("stagingsite", "false").Inc()
 			}
+		} else {
+			appmetrics.Errors.WithLabelValues("stagingsite", "false").Inc()
 		}
 		if site.Status.State == sitev1.StateFailed && !isChanged {
 			isChanged = true

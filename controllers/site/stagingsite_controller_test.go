@@ -28,6 +28,8 @@ import (
 	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
 	"github.com/szeber/kube-stager/helpers"
 	"github.com/szeber/kube-stager/helpers/annotations"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
+	"github.com/szeber/kube-stager/internal/metricstest"
 	"github.com/szeber/kube-stager/internal/testutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -439,6 +441,8 @@ var _ = Describe("StagingSite controller", func() {
 		})
 
 		It("should eventually reach Complete state", func() {
+			transitionsBefore := metricstest.GetCounterValue(appmetrics.SiteStateTransitions, ns, string(sitev1.StatePending), string(sitev1.StateComplete))
+
 			fetched := &sitev1.StagingSite{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: siteName, Namespace: ns}, fetched)).To(Succeed())
@@ -451,6 +455,9 @@ var _ = Describe("StagingSite controller", func() {
 			Expect(fetched.Status.ConfigsAreCreated).To(BeTrue())
 			Expect(fetched.Status.WorkloadsAreCreated).To(BeTrue())
 			Expect(fetched.Status.NetworkingObjectsAreCreated).To(BeTrue())
+
+			transitionsAfter := metricstest.GetCounterValue(appmetrics.SiteStateTransitions, ns, string(sitev1.StatePending), string(sitev1.StateComplete))
+			Expect(transitionsAfter-transitionsBefore).To(BeNumerically(">=", 1), "expected site_state_transitions_total(Pending->Complete) to be incremented")
 		})
 	})
 
@@ -523,6 +530,7 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(fetched.Status.Enabled).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
+			disableBefore := metricstest.GetCounterValue(appmetrics.SiteAutoDisabled, ns)
 			testClock.SetNow(fetched.Status.DisableAt.Add(1 * time.Minute))
 
 			// envtest won't re-enqueue after the deadline passes, so write an annotation to force reconciliation
@@ -539,6 +547,9 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: siteName, Namespace: ns}, fetched)).To(Succeed())
 				g.Expect(fetched.Status.Enabled).To(BeFalse())
 			}, timeout, interval).Should(Succeed())
+
+			disableAfter := metricstest.GetCounterValue(appmetrics.SiteAutoDisabled, ns)
+			Expect(disableAfter-disableBefore).To(BeNumerically(">=", 1), "expected site_auto_disabled_total to be incremented")
 		})
 	})
 
@@ -576,6 +587,7 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(fetched.Status.DeleteAt).NotTo(BeNil())
 			}, timeout, interval).Should(Succeed())
 
+			deleteBefore := metricstest.GetCounterValue(appmetrics.SiteAutoDeleted, ns)
 			testClock.SetNow(fetched.Status.DeleteAt.Add(1 * time.Minute))
 
 			// envtest won't re-enqueue after the deadline passes, so write an annotation to force reconciliation
@@ -593,6 +605,9 @@ var _ = Describe("StagingSite controller", func() {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(client.IgnoreNotFound(err)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
+
+			deleteAfter := metricstest.GetCounterValue(appmetrics.SiteAutoDeleted, ns)
+			Expect(deleteAfter-deleteBefore).To(BeNumerically(">=", 1), "expected site_auto_deleted_total to be incremented")
 		})
 	})
 

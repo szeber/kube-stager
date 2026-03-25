@@ -8,6 +8,7 @@ import (
 	"github.com/szeber/kube-stager/helpers"
 	"github.com/szeber/kube-stager/helpers/kubernetes"
 	"github.com/szeber/kube-stager/helpers/labels"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -65,6 +66,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 	}
 
 	if len(site.Spec.Services) == 0 {
+		appmetrics.WebhookDenied.WithLabelValues("stagingsite", "no_services_defined").Inc()
 		return admission.Denied("There are no services defined in the site")
 	}
 
@@ -77,6 +79,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 		serviceNames = append(serviceNames, name)
 		config, ok := serviceConfigs[name]
 		if !ok {
+			appmetrics.WebhookDenied.WithLabelValues("stagingsite", "invalid_config").Inc()
 			return admission.Denied("The service config '" + name + "' doesn't exist")
 		}
 		if serviceSpec.ImageTag == "" {
@@ -96,6 +99,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 		}
 		if serviceSpec.MongoEnvironment != "" {
 			if mongoEnvironments[serviceSpec.MongoEnvironment].Name == "" {
+				appmetrics.WebhookDenied.WithLabelValues("stagingsite", "invalid_environment").Inc()
 				return admission.Denied(
 					fmt.Sprintf(
 						"Invalid mongo environment '%s' in service '%s'",
@@ -109,6 +113,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 		}
 		if serviceSpec.MysqlEnvironment != "" {
 			if mysqlEnvironments[serviceSpec.MysqlEnvironment].Name == "" {
+				appmetrics.WebhookDenied.WithLabelValues("stagingsite", "invalid_environment").Inc()
 				return admission.Denied(
 					fmt.Sprintf(
 						"Invalid mysql environment '%s' in service '%s'",
@@ -122,6 +127,7 @@ func (r *StagingsiteHandler) Handle(ctx context.Context, req admission.Request) 
 		}
 		if serviceSpec.RedisEnvironment != "" {
 			if redisEnvironments[serviceSpec.RedisEnvironment].Name == "" {
+				appmetrics.WebhookDenied.WithLabelValues("stagingsite", "invalid_environment").Inc()
 				return admission.Denied(
 					fmt.Sprintf(
 						"Invalid redis environment '%s' in service '%s'",

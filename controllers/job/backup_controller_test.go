@@ -10,6 +10,8 @@ import (
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
+	"github.com/szeber/kube-stager/internal/metricstest"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -175,6 +177,9 @@ var _ = Describe("BackupController", func() {
 		})
 
 		It("should transition to Complete", func() {
+			completionsBefore := metricstest.GetCounterValue(appmetrics.JobCompletions, "backup", "success")
+			backupCompletionsBefore := metricstest.GetCounterValue(appmetrics.BackupCompletions, ns, string(jobv1.BackupTypeManual))
+
 			backup := &jobv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      backupName,
@@ -192,6 +197,12 @@ var _ = Describe("BackupController", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(backup), fetched)).To(Succeed())
 				g.Expect(fetched.Status.State).To(Equal(jobv1.Complete))
 			}, timeout, interval).Should(Succeed())
+
+			completionsAfter := metricstest.GetCounterValue(appmetrics.JobCompletions, "backup", "success")
+			Expect(completionsAfter-completionsBefore).To(BeNumerically(">=", 1), "expected job_completions_total(backup, success) to be incremented")
+
+			backupCompletionsAfter := metricstest.GetCounterValue(appmetrics.BackupCompletions, ns, string(jobv1.BackupTypeManual))
+			Expect(backupCompletionsAfter-backupCompletionsBefore).To(BeNumerically(">=", 1), "expected backup_completions_total to be incremented")
 		})
 	})
 
@@ -438,6 +449,7 @@ var _ = Describe("BackupController", func() {
 		})
 
 		It("should transition to Failed when the batch Job reports a Failed condition", func() {
+			failuresBefore := metricstest.GetCounterValue(appmetrics.JobCompletions, "backup", "failure")
 			backup := &jobv1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      backupName,
@@ -498,6 +510,9 @@ var _ = Describe("BackupController", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(backup), backup)).To(Succeed())
 				g.Expect(backup.Status.State).To(Equal(jobv1.Failed))
 			}, timeout, interval).Should(Succeed())
+
+			failuresAfter := metricstest.GetCounterValue(appmetrics.JobCompletions, "backup", "failure")
+			Expect(failuresAfter-failuresBefore).To(BeNumerically(">=", 1), "expected job_completions_total(backup, failure) to be incremented")
 		})
 	})
 

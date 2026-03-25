@@ -8,6 +8,7 @@ import (
 	"github.com/szeber/kube-stager/handlers/template"
 	"github.com/szeber/kube-stager/helpers"
 	errorshelpers "github.com/szeber/kube-stager/helpers/errors"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -68,6 +69,7 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 	if config.Spec.DefaultMongoEnvironment != "" {
 		logger.Info("Validating default mongo environment: " + config.Spec.DefaultMongoEnvironment)
 		if _, ok := templateHandler.GetMongo()[config.Spec.DefaultMongoEnvironment]; !ok {
+			appmetrics.WebhookDenied.WithLabelValues("serviceconfig", "invalid_environment").Inc()
 			return admission.Denied("Invalid mongo environment: " + config.Spec.DefaultMongoEnvironment)
 		}
 	}
@@ -75,6 +77,7 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 	if config.Spec.DefaultMysqlEnvironment != "" {
 		logger.Info("Validating default mysql environment: " + config.Spec.DefaultMysqlEnvironment)
 		if _, ok := templateHandler.GetMysql()[config.Spec.DefaultMysqlEnvironment]; !ok {
+			appmetrics.WebhookDenied.WithLabelValues("serviceconfig", "invalid_environment").Inc()
 			return admission.Denied("Invalid mysql environment: " + config.Spec.DefaultMysqlEnvironment)
 		}
 	}
@@ -82,6 +85,7 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 	if config.Spec.DefaultRedisEnvironment != "" {
 		logger.Info("Validating default redis environment: " + config.Spec.DefaultRedisEnvironment)
 		if _, ok := templateHandler.GetRedis()[config.Spec.DefaultRedisEnvironment]; !ok {
+			appmetrics.WebhookDenied.WithLabelValues("serviceconfig", "invalid_environment").Inc()
 			return admission.Denied("Invalid redis environment: " + config.Spec.DefaultRedisEnvironment)
 		}
 	}
@@ -89,6 +93,7 @@ func (r *ServiceConfigCreateOrUpdateHandler) Handle(ctx context.Context, req adm
 	logger.Info("Validating templates")
 	err = r.validateTemplates(*config, &templateHandler)
 	if errorshelpers.IsControllerError(err) {
+		appmetrics.WebhookDenied.WithLabelValues("serviceconfig", "template_validation_failed").Inc()
 		return admission.Denied(err.Error())
 	} else if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)

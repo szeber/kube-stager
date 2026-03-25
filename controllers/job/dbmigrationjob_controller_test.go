@@ -10,6 +10,8 @@ import (
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
+	"github.com/szeber/kube-stager/internal/metricstest"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -293,6 +295,7 @@ var _ = Describe("DbMigrationJobController", func() {
 		})
 
 		It("should transition to Failed after the deadline passes", func() {
+			failuresBefore := metricstest.GetCounterValue(appmetrics.JobCompletions, "dbmigration", "failure")
 			job := &jobv1.DbMigrationJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      jobName,
@@ -334,6 +337,9 @@ var _ = Describe("DbMigrationJobController", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(job), fetched)).To(Succeed())
 				g.Expect(fetched.Status.State).To(Equal(jobv1.Failed))
 			}, timeout, interval).Should(Succeed())
+
+			failuresAfter := metricstest.GetCounterValue(appmetrics.JobCompletions, "dbmigration", "failure")
+			Expect(failuresAfter-failuresBefore).To(BeNumerically(">=", 1), "expected job_completions_total(dbmigration, failure) to be incremented")
 		})
 	})
 
