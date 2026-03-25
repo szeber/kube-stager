@@ -12,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
+	"github.com/szeber/kube-stager/internal/metricstest"
 	"github.com/szeber/kube-stager/internal/testutil"
 )
 
@@ -70,6 +72,7 @@ func TestStagingsiteHandler_MissingServiceConfig(t *testing.T) {
 		},
 	})
 
+	before := metricstest.GetCounterValue(appmetrics.WebhookDenied, "stagingsite", "invalid_config")
 	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
@@ -77,6 +80,10 @@ func TestStagingsiteHandler_MissingServiceConfig(t *testing.T) {
 	}
 	if resp.Result == nil || resp.Result.Code != http.StatusForbidden {
 		t.Errorf("expected Forbidden (403), got: %v", resp.Result)
+	}
+	after := metricstest.GetCounterValue(appmetrics.WebhookDenied, "stagingsite", "invalid_config")
+	if after-before != 1 {
+		t.Errorf("expected webhook_denied_total(stagingsite, invalid_config) to increment by 1, got delta %v", after-before)
 	}
 }
 
@@ -98,6 +105,7 @@ func TestStagingsiteHandler_InvalidMysqlEnvironment(t *testing.T) {
 		},
 	})
 
+	before := metricstest.GetCounterValue(appmetrics.WebhookDenied, "stagingsite", "invalid_environment")
 	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
@@ -105,6 +113,10 @@ func TestStagingsiteHandler_InvalidMysqlEnvironment(t *testing.T) {
 	}
 	if resp.Result == nil || resp.Result.Code != http.StatusForbidden {
 		t.Errorf("expected Forbidden (403), got: %v", resp.Result)
+	}
+	after := metricstest.GetCounterValue(appmetrics.WebhookDenied, "stagingsite", "invalid_environment")
+	if after-before != 1 {
+		t.Errorf("expected webhook_denied_total(stagingsite, invalid_environment) to increment by 1, got delta %v", after-before)
 	}
 }
 
@@ -139,6 +151,7 @@ func TestStagingsiteHandler_EmptyServices(t *testing.T) {
 
 	site := testutil.NewTestStagingSite("mysite", ns, nil)
 
+	before := metricstest.GetCounterValue(appmetrics.WebhookDenied, "stagingsite", "no_services_defined")
 	resp := handler.Handle(context.Background(), makeSiteAdmissionRequest(t, site))
 
 	if resp.Allowed {
@@ -146,6 +159,10 @@ func TestStagingsiteHandler_EmptyServices(t *testing.T) {
 	}
 	if resp.Result == nil || resp.Result.Code != http.StatusForbidden {
 		t.Errorf("expected Forbidden (403), got: %v", resp.Result)
+	}
+	after := metricstest.GetCounterValue(appmetrics.WebhookDenied, "stagingsite", "no_services_defined")
+	if after-before != 1 {
+		t.Errorf("expected webhook_denied_total(stagingsite, no_services_defined) to increment by 1, got delta %v", after-before)
 	}
 }
 

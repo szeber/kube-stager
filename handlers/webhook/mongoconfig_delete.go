@@ -7,6 +7,7 @@ import (
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
 	"github.com/szeber/kube-stager/helpers/indexes"
 	"github.com/szeber/kube-stager/helpers/labels"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,6 +44,7 @@ func (r *MongoConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 				siteNames,
 			),
 		)
+		appmetrics.WebhookDenied.WithLabelValues("mongoconfig_delete", "resource_in_use").Inc()
 		return admission.Denied(fmt.Sprintf("There are sites using this environment: %v", siteNames))
 	}
 
@@ -68,6 +70,7 @@ func (r *MongoConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 				serviceNames,
 			),
 		)
+		appmetrics.WebhookDenied.WithLabelValues("mongoconfig_delete", "resource_in_use").Inc()
 		return admission.Denied(fmt.Sprintf("There are services using this environment as a default: %v", serviceNames))
 	}
 

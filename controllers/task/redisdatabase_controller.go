@@ -22,6 +22,7 @@ import (
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	controller "github.com/szeber/kube-stager/controllers"
 	"github.com/szeber/kube-stager/handlers/database"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,6 +51,7 @@ func (r *RedisDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	result, err := r.doReconcile(ctx, req)
 
 	if err != nil {
+		appmetrics.Errors.WithLabelValues("redis", "false").Inc()
 		sentry.CaptureException(err)
 	}
 

@@ -11,6 +11,8 @@ import (
 
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
 	"github.com/szeber/kube-stager/helpers/labels"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
+	"github.com/szeber/kube-stager/internal/metricstest"
 	"github.com/szeber/kube-stager/internal/testutil"
 )
 
@@ -51,6 +53,7 @@ func TestServiceConfigDeleteHandler_SitesUsingService(t *testing.T) {
 		Client: testutil.NewFakeClient(site),
 	}
 
+	before := metricstest.GetCounterValue(appmetrics.WebhookDenied, "serviceconfig_delete", "resource_in_use")
 	resp := handler.Handle(context.Background(), makeDeleteAdmissionRequest(ns, serviceName))
 
 	if resp.Allowed {
@@ -58,6 +61,10 @@ func TestServiceConfigDeleteHandler_SitesUsingService(t *testing.T) {
 	}
 	if resp.Result == nil || resp.Result.Code != http.StatusForbidden {
 		t.Errorf("expected Forbidden (403), got: %v", resp.Result)
+	}
+	after := metricstest.GetCounterValue(appmetrics.WebhookDenied, "serviceconfig_delete", "resource_in_use")
+	if after-before != 1 {
+		t.Errorf("expected webhook_denied_total to increment by 1, got delta %v", after-before)
 	}
 }
 

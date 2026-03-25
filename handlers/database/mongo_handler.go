@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus"
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -26,6 +28,9 @@ func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.Mong
 	bool,
 	error,
 ) {
+	timer := prometheus.NewTimer(appmetrics.DatabaseOperationDuration.WithLabelValues("mongo", "reconcile"))
+	defer timer.ObserveDuration()
+
 	client, ctx, cancel, err := getMongoConnection(config, logger)
 
 	if cancel != nil {
@@ -33,6 +38,7 @@ func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.Mong
 	}
 
 	if err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mongo", "reconcile", "error").Inc()
 		return false, err
 	}
 
@@ -46,8 +52,11 @@ func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.Mong
 	}
 
 	if err := task.reconcileTask(); err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mongo", "reconcile", "error").Inc()
 		return false, err
 	}
+
+	appmetrics.DatabaseOperations.WithLabelValues("mongo", "reconcile", "success").Inc()
 
 	isChanged := false
 	if database.Status.State != taskv1.Complete {
@@ -59,6 +68,9 @@ func ReconcileMongoDatabase(database *taskv1.MongoDatabase, config configv1.Mong
 }
 
 func DeleteMongoDatabase(database *taskv1.MongoDatabase, config configv1.MongoConfig, logger logr.Logger) error {
+	timer := prometheus.NewTimer(appmetrics.DatabaseOperationDuration.WithLabelValues("mongo", "delete"))
+	defer timer.ObserveDuration()
+
 	client, ctx, cancel, err := getMongoConnection(config, logger)
 
 	if cancel != nil {
@@ -66,6 +78,7 @@ func DeleteMongoDatabase(database *taskv1.MongoDatabase, config configv1.MongoCo
 	}
 
 	if err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mongo", "delete", "error").Inc()
 		return err
 	}
 
@@ -78,7 +91,13 @@ func DeleteMongoDatabase(database *taskv1.MongoDatabase, config configv1.MongoCo
 		database:   database.Spec.DatabaseName,
 	}
 
-	return task.deleteTask()
+	if err := task.deleteTask(); err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mongo", "delete", "error").Inc()
+		return err
+	}
+
+	appmetrics.DatabaseOperations.WithLabelValues("mongo", "delete", "success").Inc()
+	return nil
 }
 
 func getMongoConnection(config configv1.MongoConfig, logger logr.Logger) (

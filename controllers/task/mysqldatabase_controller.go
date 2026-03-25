@@ -24,6 +24,7 @@ import (
 	controller "github.com/szeber/kube-stager/controllers"
 	"github.com/szeber/kube-stager/handlers/database"
 	"github.com/szeber/kube-stager/helpers"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,6 +52,7 @@ func (r *MysqlDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	result, err := r.doReconcile(ctx, req)
 
 	if err != nil {
+		appmetrics.Errors.WithLabelValues("mysql", "false").Inc()
 		sentry.CaptureException(err)
 	}
 

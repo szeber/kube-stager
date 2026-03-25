@@ -11,6 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
+	"github.com/szeber/kube-stager/internal/metricstest"
 	"github.com/szeber/kube-stager/internal/testutil"
 )
 
@@ -67,6 +69,7 @@ func TestBackupCreateOrUpdateHandler_SiteNotFound(t *testing.T) {
 		Decoder: admission.NewDecoder(testutil.NewTestScheme()),
 	}
 
+	before := metricstest.GetCounterValue(appmetrics.WebhookDenied, "backup", "site_not_found")
 	resp := handler.Handle(context.Background(), makeBackupAdmissionRequest(t, backup))
 
 	if resp.Allowed {
@@ -74,6 +77,10 @@ func TestBackupCreateOrUpdateHandler_SiteNotFound(t *testing.T) {
 	}
 	if resp.Result == nil || resp.Result.Code != http.StatusForbidden {
 		t.Errorf("expected Forbidden (403), got: %v", resp.Result)
+	}
+	after := metricstest.GetCounterValue(appmetrics.WebhookDenied, "backup", "site_not_found")
+	if after-before != 1 {
+		t.Errorf("expected webhook_denied_total(backup, site_not_found) to increment by 1, got delta %v", after-before)
 	}
 }
 

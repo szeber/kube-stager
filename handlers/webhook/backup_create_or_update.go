@@ -6,6 +6,7 @@ import (
 	"fmt"
 	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
@@ -41,6 +42,7 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 	}
 
 	if err != nil {
+		appmetrics.WebhookDenied.WithLabelValues("backup", "site_not_found").Inc()
 		return admission.Denied(
 			fmt.Sprintf(
 				"Staging site with name %s not found in namespace %s",

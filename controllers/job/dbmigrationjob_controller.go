@@ -29,6 +29,7 @@ import (
 	"github.com/szeber/kube-stager/helpers"
 	"github.com/szeber/kube-stager/helpers/labels"
 	"github.com/szeber/kube-stager/helpers/pod"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,6 +64,7 @@ func (r *DbMigrationJobReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	result, err := r.doReconcile(ctx, req)
 
 	if err != nil {
+		appmetrics.Errors.WithLabelValues("dbmigration", "false").Inc()
 		sentry.CaptureException(err)
 	}
 
@@ -146,12 +148,18 @@ func (r *DbMigrationJobReconciler) processRunningJob(job *jobv1.DbMigrationJob, 
 		if v.Type == batchv1.JobComplete && v.Status == corev1.ConditionTrue {
 			logger.V(0).Info("Job finished successfully")
 			job.Status.State = jobv1.Complete
+			appmetrics.JobCompletions.WithLabelValues("dbmigration", "success").Inc()
+			if job.Status.DeadlineTimestamp != nil {
+				duration := time.Since(job.Status.DeadlineTimestamp.Add(-time.Duration(job.Spec.DeadlineSeconds) * time.Second))
+				appmetrics.JobDuration.WithLabelValues("dbmigration").Observe(duration.Seconds())
+			}
 			return true, nil
 		}
 
 		if v.Type == batchv1.JobFailed && v.Status == corev1.ConditionTrue {
 			logger.V(0).Info("Job failed", "status", v.Message, "reason", v.Reason)
 			job.Status.State = jobv1.Failed
+			appmetrics.JobCompletions.WithLabelValues("dbmigration", "failure").Inc()
 			return true, nil
 		}
 	}
@@ -159,6 +167,7 @@ func (r *DbMigrationJobReconciler) processRunningJob(job *jobv1.DbMigrationJob, 
 	if time.Now().After(job.Status.DeadlineTimestamp.Time) {
 		logger.V(0).Info("The job deadline has expired. Failing job.")
 		job.Status.State = jobv1.Failed
+		appmetrics.JobCompletions.WithLabelValues("dbmigration", "failure").Inc()
 		return true, nil
 	}
 

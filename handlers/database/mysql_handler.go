@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/prometheus/client_golang/prometheus"
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 )
 
 type mysqlReconcileTask struct {
@@ -28,6 +30,9 @@ func ReconcileMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.Mysq
 	bool,
 	error,
 ) {
+	timer := prometheus.NewTimer(appmetrics.DatabaseOperationDuration.WithLabelValues("mysql", "reconcile"))
+	defer timer.ObserveDuration()
+
 	logger.Info("Connecting to database " + config.Name)
 
 	dataSourceName := fmt.Sprintf(
@@ -41,6 +46,7 @@ func ReconcileMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.Mysq
 	connection, err := sql.Open("mysql", dataSourceName)
 
 	if err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mysql", "reconcile", "error").Inc()
 		return false, err
 	}
 
@@ -59,8 +65,11 @@ func ReconcileMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.Mysq
 	}
 
 	if err := task.reconcileTask(); err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mysql", "reconcile", "error").Inc()
 		return false, err
 	}
+
+	appmetrics.DatabaseOperations.WithLabelValues("mysql", "reconcile", "success").Inc()
 
 	isChanged := false
 	if database.Status.State != taskv1.Complete {
@@ -72,6 +81,9 @@ func ReconcileMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.Mysq
 }
 
 func DeleteMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.MysqlConfig, logger logr.Logger) error {
+	timer := prometheus.NewTimer(appmetrics.DatabaseOperationDuration.WithLabelValues("mysql", "delete"))
+	defer timer.ObserveDuration()
+
 	logger.Info("Connecting to database " + config.Name)
 
 	dataSourceName := fmt.Sprintf(
@@ -85,6 +97,7 @@ func DeleteMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.MysqlCo
 	connection, err := sql.Open("mysql", dataSourceName)
 
 	if err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mysql", "delete", "error").Inc()
 		return err
 	}
 
@@ -100,7 +113,13 @@ func DeleteMysqlDatabase(database *taskv1.MysqlDatabase, config configv1.MysqlCo
 		database:   database.Spec.DatabaseName,
 	}
 
-	return task.deleteTask()
+	if err := task.deleteTask(); err != nil {
+		appmetrics.DatabaseOperations.WithLabelValues("mysql", "delete", "error").Inc()
+		return err
+	}
+
+	appmetrics.DatabaseOperations.WithLabelValues("mysql", "delete", "success").Inc()
+	return nil
 }
 
 func (r *mysqlReconcileTask) reconcileTask() error {

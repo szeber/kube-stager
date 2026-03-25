@@ -5,6 +5,7 @@ import (
 	"fmt"
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
 	"github.com/szeber/kube-stager/helpers/labels"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,6 +37,7 @@ func (r *ServiceConfigDeleteHandler) Handle(ctx context.Context, req admission.R
 			siteNames = append(siteNames, v.Name)
 		}
 		logger.Info(fmt.Sprintf("Denying delete request, because there are sites using this service: %v", siteNames))
+		appmetrics.WebhookDenied.WithLabelValues("serviceconfig_delete", "resource_in_use").Inc()
 		return admission.Denied(fmt.Sprintf("There are sites using this service: %v", siteNames))
 	}
 
