@@ -24,6 +24,7 @@ import (
 	controller "github.com/szeber/kube-stager/controllers"
 	"github.com/szeber/kube-stager/handlers/database"
 	"github.com/szeber/kube-stager/helpers"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +34,8 @@ import (
 // MysqlDatabaseReconciler reconciles a MysqlDatabase object
 type MysqlDatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	DatabaseReconciler database.MysqlReconciler
 }
 
 //+kubebuilder:rbac:groups=config.operator.kube-stager.io,resources=mysqlconfigs,verbs=get
@@ -49,7 +51,8 @@ type MysqlDatabaseReconciler struct {
 func (r *MysqlDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
+		appmetrics.Errors.WithLabelValues("mysql", "false").Inc()
 		sentry.CaptureException(err)
 	}
 
@@ -61,7 +64,7 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 	var db taskv1.MysqlDatabase
 
-	if err := r.Get(ctx, req.NamespacedName, &db); nil != err {
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "unable to fetch database")
 		}
@@ -74,22 +77,22 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	var config configv1.MysqlConfig
 
 	configKey := client.ObjectKey{Namespace: db.Namespace, Name: db.Spec.EnvironmentConfig.Environment}
-	if err := r.Get(ctx, configKey, &config); nil != err {
+	if err := r.Get(ctx, configKey, &config); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	isDbChanged := false
 
-	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if err := database.DeleteMysqlDatabase(&db, config, logger); nil != err {
+	if !db.DeletionTimestamp.IsZero() {
+		if err := r.DatabaseReconciler.Delete(&db, config, logger); err != nil {
 			return ctrl.Result{}, err
 		}
 
-		previousFinalizersLength := len(db.ObjectMeta.Finalizers)
-		db.ObjectMeta.Finalizers = helpers.RemoveStringFromSlice(db.ObjectMeta.Finalizers, helpers.MysqlFinalizerName)
+		previousFinalizersLength := len(db.Finalizers)
+		db.Finalizers = helpers.RemoveStringFromSlice(db.Finalizers, helpers.MysqlFinalizerName)
 
-		if len(db.ObjectMeta.Finalizers) != previousFinalizersLength {
-			if err := r.Update(ctx, &db); nil != err {
+		if len(db.Finalizers) != previousFinalizersLength {
+			if err := r.Update(ctx, &db); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -97,15 +100,15 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	if !helpers.SliceContainsString(db.ObjectMeta.Finalizers, helpers.MysqlFinalizerName) {
-		db.ObjectMeta.Finalizers = append(db.ObjectMeta.Finalizers, helpers.MysqlFinalizerName)
-		if err := r.Update(ctx, &db); nil != err {
+	if !helpers.SliceContainsString(db.Finalizers, helpers.MysqlFinalizerName) {
+		db.Finalizers = append(db.Finalizers, helpers.MysqlFinalizerName)
+		if err := r.Update(ctx, &db); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	changed, err := database.ReconcileMysqlDatabase(&db, config, logger)
+	changed, err := r.DatabaseReconciler.Reconcile(&db, config, logger)
 
 	isDbChanged = isDbChanged || changed
 
@@ -114,6 +117,9 @@ func (r *MysqlDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MysqlDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.DatabaseReconciler == nil {
+		r.DatabaseReconciler = database.DefaultMysqlReconciler{}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&taskv1.MysqlDatabase{}).
 		Complete(r)

@@ -26,7 +26,7 @@ func (r DbMigrationJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ct
 
 	var list jobv1.DbMigrationJobList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -45,11 +45,11 @@ func (r DbMigrationJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ct
 			}
 			var serviceConfig configv1.ServiceConfig
 			err = r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, &serviceConfig)
-			if nil != err {
+			if err != nil {
 				return false, err
 			}
 
-			if nil == serviceConfig.Spec.MigrationJobPodSpec {
+			if serviceConfig.Spec.MigrationJobPodSpec == nil {
 				// No pod spec for migrations, so this service does not do migrations
 				continue
 			}
@@ -64,7 +64,7 @@ func (r DbMigrationJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ct
 				"tag",
 				site.Spec.Services[serviceConfig.Name].ImageTag,
 			)
-			if nil != err {
+			if err != nil {
 				return false, err
 			}
 		}
@@ -88,19 +88,19 @@ func (r DbMigrationJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ct
 
 	for serviceName, job := range jobsToDelete {
 		logger.V(1).Info("Deleting migration job for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &job); nil != err {
+		if err = r.Writer.Delete(ctx, &job); err != nil {
 			return isComplete, err
 		}
 	}
 	for serviceName, job := range jobsToUpdate {
 		logger.V(1).Info("Updating migration job for service " + serviceName)
-		if err = r.Writer.Update(ctx, &job); nil != err {
+		if err = r.Writer.Update(ctx, &job); err != nil {
 			return isComplete, err
 		}
 	}
 	for serviceName, job := range jobsToCreate {
 		logger.V(1).Info("Creating migration job for service " + serviceName)
-		if err = r.Writer.Create(ctx, &job); nil != err {
+		if err = r.Writer.Create(ctx, &job); err != nil {
 			return isComplete, err
 		}
 	}
@@ -117,7 +117,7 @@ func (r DbMigrationJobHandler) EnsureJobsAreComplete(site *sitev1.StagingSite, c
 
 	var list jobv1.DbMigrationJobList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	logger.V(1).Info("Retrieved list", "count", len(list.Items))
@@ -125,7 +125,7 @@ func (r DbMigrationJobHandler) EnsureJobsAreComplete(site *sitev1.StagingSite, c
 	isEverythingReady := true
 
 	for _, database := range list.Items {
-		if jobv1.Failed == database.Status.State {
+		if database.Status.State == jobv1.Failed {
 			return false, errors.DatabaseMigrationError{
 				SiteName:    database.Spec.SiteName,
 				ServiceName: database.Spec.ServiceName,
@@ -148,11 +148,11 @@ func (r DbMigrationJobHandler) getPopulatedJob(
 	serviceConfig *configv1.ServiceConfig,
 ) (jobv1.DbMigrationJob, error) {
 	job := jobv1.DbMigrationJob{}
-	if err := job.PopulateFomSite(site, serviceConfig); nil != err {
+	if err := job.PopulateFomSite(site, serviceConfig); err != nil {
 		return job, err
 	}
 
-	if err := ctrl.SetControllerReference(site, &job, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, &job, r.Scheme); err != nil {
 		return job, err
 	}
 

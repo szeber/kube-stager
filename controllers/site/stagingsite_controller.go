@@ -34,6 +34,7 @@ import (
 	"github.com/szeber/kube-stager/helpers/annotations"
 	errorhelpers "github.com/szeber/kube-stager/helpers/errors"
 	"github.com/szeber/kube-stager/helpers/indexes"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"hash/fnv"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,7 +58,7 @@ type StagingSiteReconciler struct {
 
 type realClock struct{}
 
-func (_ realClock) Now() time.Time {
+func (realClock) Now() time.Time {
 	return time.Now()
 }
 
@@ -88,7 +89,7 @@ type Clock interface {
 func (r *StagingSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
 		sentry.CaptureException(err)
 	}
 
@@ -108,9 +109,18 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	stateBeforeReconcile := site.Status.State
+	defer func() {
+		if stateBeforeReconcile != "" && site.Status.State != stateBeforeReconcile {
+			appmetrics.SiteStateTransitions.WithLabelValues(site.Namespace, string(stateBeforeReconcile), string(site.Status.State)).Inc()
+			if site.Status.State == sitev1.StateComplete && !site.CreationTimestamp.IsZero() {
+				appmetrics.SiteProvisioningDuration.WithLabelValues(site.Namespace).Observe(r.Now().Sub(site.CreationTimestamp.Time).Seconds())
+			}
+		}
+	}()
 	logger.V(0).Info("Fetched staging site " + site.Name)
 
-	if nil != site.DeletionTimestamp {
+	if site.DeletionTimestamp != nil {
 		return r.handleDelete(ctx, logger, site)
 	}
 
@@ -119,9 +129,9 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	logger.V(0).Info("Ensuring the status is up to date")
-	if changed, err := r.ensureStatusIsUpToDate(site, ctx); nil != err || changed {
+	if changed, err := r.ensureStatusIsUpToDate(site, ctx); err != nil || changed {
 		result := ctrl.Result{}
-		if changed && nil == err {
+		if changed && err == nil {
 			result = ctrl.Result{Requeue: true}
 		}
 		logger.V(0).Info("Status changed", "result", result)
@@ -130,21 +140,24 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 
 	r.resetStatusErrors(site)
 
-	if nil != site.Status.DeleteAt && site.Status.DeleteAt.Time.Before(r.Clock.Now()) {
-		err := r.Delete(ctx, site)
-		return ctrl.Result{}, err
+	if site.Status.DeleteAt != nil && site.Status.DeleteAt.Time.Before(r.Now()) {
+		if err := r.Delete(ctx, site); err != nil {
+			return ctrl.Result{}, err
+		}
+		appmetrics.SiteAutoDeleted.WithLabelValues(site.Namespace).Inc()
+		return ctrl.Result{}, nil
 	}
 
 	isSiteChanged := false
 	logger.V(0).Info("Ensuring databases are created")
-	if changed, err := r.ensureDatabasesAreCreated(site, ctx); nil != err {
+	if changed, err := r.ensureDatabasesAreCreated(site, ctx); err != nil {
 		return r.SaveStatusUpdatesIfObjectChanged(changed, ctx, site, ctrl.Result{}, err)
 	} else {
 		isSiteChanged = changed
 	}
 
 	logger.V(0).Info("Ensuring configs are up to date")
-	if changed, err := r.ensureConfigsAreUpToDate(site, ctx); nil != err {
+	if changed, err := r.ensureConfigsAreUpToDate(site, ctx); err != nil {
 		return r.SaveStatusUpdatesIfObjectChanged(isSiteChanged || changed, ctx, site, ctrl.Result{}, err)
 	} else {
 		isSiteChanged = isSiteChanged || changed
@@ -155,7 +168,7 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	logger.V(0).Info("Ensuring databases are initialised")
-	if changed, err := r.ensureDatabasesAreInitialised(site, ctx); nil != err {
+	if changed, err := r.ensureDatabasesAreInitialised(site, ctx); err != nil {
 		return r.SaveStatusUpdatesIfObjectChanged(isSiteChanged || changed, ctx, site, ctrl.Result{}, err)
 	} else {
 		isSiteChanged = isSiteChanged || changed
@@ -166,7 +179,7 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	logger.V(0).Info("Ensuring databases are migrated")
-	if changed, err := r.ensureDatabaseMigrationJobsAreCreated(site, ctx); nil != err {
+	if changed, err := r.ensureDatabaseMigrationJobsAreCreated(site, ctx); err != nil {
 		return r.SaveStatusUpdatesIfObjectChanged(isSiteChanged || changed, ctx, site, ctrl.Result{}, err)
 	} else {
 		isSiteChanged = isSiteChanged || changed
@@ -177,14 +190,14 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	logger.V(0).Info("Ensuring workloads are up to date")
-	if changed, err := r.ensureWorkloadObjectsAreUpToDate(site, ctx); nil != err {
+	if changed, err := r.ensureWorkloadObjectsAreUpToDate(site, ctx); err != nil {
 		return r.SaveStatusUpdatesIfObjectChanged(isSiteChanged || changed, ctx, site, ctrl.Result{}, err)
 	} else {
 		isSiteChanged = isSiteChanged || changed
 	}
 
 	logger.V(0).Info("Ensuring networking objects are up to date")
-	if changed, err := r.ensureNetworkingObjectsAreUpToDate(site, ctx); nil != err {
+	if changed, err := r.ensureNetworkingObjectsAreUpToDate(site, ctx); err != nil {
 		return r.SaveStatusUpdatesIfObjectChanged(isSiteChanged || changed, ctx, site, ctrl.Result{}, err)
 	} else {
 		isSiteChanged = isSiteChanged || changed
@@ -195,10 +208,10 @@ func (r *StagingSiteReconciler) doReconcile(ctx context.Context, req ctrl.Reques
 		isSiteChanged = true
 	}
 
-	if nil != site.Status.NextBackupTime && site.Status.NextBackupTime.Time.Before(r.Clock.Now()) {
+	if site.Status.NextBackupTime != nil && site.Status.NextBackupTime.Time.Before(r.Now()) {
 		changed, err := r.handleBackup(site, ctx)
 		isSiteChanged = isSiteChanged || changed
-		if nil != err {
+		if err != nil {
 			return r.SaveStatusUpdatesIfObjectChanged(
 				isSiteChanged,
 				ctx,
@@ -225,13 +238,13 @@ func (r *StagingSiteReconciler) handleBackup(site *sitev1.StagingSite, ctx conte
 		Scheme: r.Scheme,
 	}
 
-	err := handler.Create(site, ctx, jobv1.BackupTypeScheduled, r.Clock.Now())
-	if nil != err {
+	err := handler.Create(site, ctx, jobv1.BackupTypeScheduled, r.Now())
+	if err != nil {
 		return false, err
 	}
 
 	site.Status.NextBackupTime, err = r.getNextBackupTimeForSite(site)
-	if nil != err {
+	if err != nil {
 		return true, err
 	}
 
@@ -240,7 +253,7 @@ func (r *StagingSiteReconciler) handleBackup(site *sitev1.StagingSite, ctx conte
 
 func (r *StagingSiteReconciler) appendFinalizer(ctx context.Context, site *sitev1.StagingSite) (ctrl.Result, error) {
 	site.Finalizers = append(site.Finalizers, helpers.SiteFinalizerName)
-	if err := r.Update(ctx, site); nil != err {
+	if err := r.Update(ctx, site); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, nil
@@ -270,7 +283,7 @@ func (r *StagingSiteReconciler) handleDelete(ctx context.Context, logger logr.Lo
 			Writer: r,
 			Scheme: r.Scheme,
 		}
-		if complete, err := backupHandler.EnsureFinalBackupIsComplete(site, ctx); nil != err || !complete {
+		if complete, err := backupHandler.EnsureFinalBackupIsComplete(site, ctx); err != nil || !complete {
 			return ctrl.Result{}, err
 		}
 	}
@@ -285,13 +298,13 @@ func (r *StagingSiteReconciler) getCtrlResultWithRecheckInterval(
 	ctx context.Context,
 	site *sitev1.StagingSite,
 ) ctrl.Result {
-	now := r.Clock.Now()
+	now := r.Now()
 	times := []time.Time{}
 	logger := log.FromContext(ctx)
 
 	logger.V(0).Info("Scheduling next site check")
 
-	if nil != site.Status.DisableAt && site.Status.Enabled {
+	if site.Status.DisableAt != nil && site.Status.Enabled {
 		if site.Status.DisableAt.Time.Before(now) {
 			return ctrl.Result{Requeue: true}
 		}
@@ -299,21 +312,21 @@ func (r *StagingSiteReconciler) getCtrlResultWithRecheckInterval(
 		times = append(times, site.Status.DisableAt.Time)
 	}
 
-	if nil != site.Status.DeleteAt {
+	if site.Status.DeleteAt != nil {
 		if site.Status.DeleteAt.Time.Before(now) {
 			return ctrl.Result{Requeue: true}
 		}
 		times = append(times, site.Status.DeleteAt.Time)
 	}
 
-	if nil != site.Status.NextBackupTime {
+	if site.Status.NextBackupTime != nil {
 		if site.Status.NextBackupTime.Time.Before(now) {
 			return ctrl.Result{Requeue: true}
 		}
 		times = append(times, site.Status.NextBackupTime.Time)
 	}
 
-	if 0 == len(times) {
+	if len(times) == 0 {
 		logger.V(0).Info("No scheduled checks necessary")
 		return ctrl.Result{}
 	}
@@ -328,58 +341,75 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 	isChanged := false
 
 	var err error
-	lastSpecChangedAt := time.Time{}
+	var lastSpecChangedAt time.Time
 
-	if "" == site.Status.State {
+	if site.Status.State == "" {
 		site.Status.State = sitev1.StatePending
 	}
 
-	if "" == site.Annotations[annotations.StagingSiteLastSpecChangeAt] {
-		lastSpecChangedAt = r.Clock.Now()
+	if site.Annotations == nil {
+		site.Annotations = map[string]string{}
+	}
+
+	annotationNeedsUpdate := false
+	if site.Annotations[annotations.StagingSiteLastSpecChangeAt] == "" {
+		lastSpecChangedAt = r.Now()
 		site.Annotations[annotations.StagingSiteLastSpecChangeAt] = lastSpecChangedAt.Format(time.RFC3339)
+		annotationNeedsUpdate = true
 	} else if lastSpecChangedAt, err = time.Parse(
 		time.RFC3339,
 		site.Annotations[annotations.StagingSiteLastSpecChangeAt],
-	); nil != err {
-		lastSpecChangedAt = r.Clock.Now()
+	); err != nil {
+		lastSpecChangedAt = r.Now()
 		site.Annotations[annotations.StagingSiteLastSpecChangeAt] = lastSpecChangedAt.Format(time.RFC3339)
+		annotationNeedsUpdate = true
+	}
+
+	if annotationNeedsUpdate {
+		if err := r.Update(ctx, site); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 
 	if site.Spec.DisableAfter.Never {
-		if nil != site.Status.DisableAt {
+		if site.Status.DisableAt != nil {
 			site.Status.DisableAt = nil
 			isChanged = true
 		}
 	} else {
 		disableAt := &metav1.Time{Time: lastSpecChangedAt.Add(site.Spec.DisableAfter.ToDuration())}
-		if nil == site.Status.DisableAt || !site.Status.DisableAt.Equal(disableAt) {
+		if site.Status.DisableAt == nil || !site.Status.DisableAt.Equal(disableAt) {
 			site.Status.DisableAt = disableAt
 			isChanged = true
 		}
 	}
 
 	if site.Spec.DeleteAfter.Never {
-		if nil != site.Status.DeleteAt {
+		if site.Status.DeleteAt != nil {
 			site.Status.DeleteAt = nil
 			isChanged = true
 		}
 	} else {
 		deleteAt := &metav1.Time{Time: lastSpecChangedAt.Add(site.Spec.DeleteAfter.ToDuration())}
-		if nil == site.Status.DeleteAt || !site.Status.DeleteAt.Equal(deleteAt) {
+		if site.Status.DeleteAt == nil || !site.Status.DeleteAt.Equal(deleteAt) {
 			site.Status.DeleteAt = deleteAt
 			isChanged = true
 		}
 	}
 
-	expectedEnabled := site.Spec.Enabled && (nil == site.Status.DisableAt || site.Status.DisableAt.Time.After(r.Clock.Now()))
+	expectedEnabled := site.Spec.Enabled && (site.Status.DisableAt == nil || site.Status.DisableAt.After(r.Now()))
 
 	if site.Status.Enabled != expectedEnabled {
+		if site.Status.Enabled && !expectedEnabled && site.Spec.Enabled {
+			appmetrics.SiteAutoDisabled.WithLabelValues(site.Namespace).Inc()
+		}
 		site.Status.Enabled = expectedEnabled
 		site.Status.State = sitev1.StatePending
 		isChanged = true
 	}
 
-	if nil == site.Status.LastAppliedConfiguration || site.Status.LastAppliedConfiguration.Time.Before(lastSpecChangedAt) {
+	if site.Status.LastAppliedConfiguration == nil || site.Status.LastAppliedConfiguration.Time.Before(lastSpecChangedAt) {
 		site.Status.LastAppliedConfiguration = &metav1.Time{Time: lastSpecChangedAt}
 		isChanged = true
 	}
@@ -388,7 +418,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 
 	for name := range site.Spec.Services {
 		config := &configv1.ServiceConfig{}
-		if err := r.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); nil != err {
+		if err := r.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); err != nil {
 			return false, err
 		}
 		serviceConfigs[config.Name] = config
@@ -410,9 +440,9 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 		}
 	}
 
-	isChanged = isChanged || 0 != len(serviceConfigs)
+	isChanged = isChanged || len(serviceConfigs) != 0
 
-	if 0 == len(site.Status.Services) {
+	if len(site.Status.Services) == 0 {
 		site.Status.Services = make(map[string]sitev1.StagingSiteServiceStatus)
 	}
 
@@ -424,19 +454,19 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 		}
 	}
 
-	if "" == site.Status.WorkloadHealth {
+	if site.Status.WorkloadHealth == "" {
 		site.Status.WorkloadHealth = sitev1.WorkloadHealthIncomplete
 	}
 
-	if nil != site.Spec.DailyBackupWindowHour {
-		if nil == site.Status.NextBackupTime || site.Status.NextBackupTime.Hour() != int(*site.Spec.DailyBackupWindowHour) {
+	if site.Spec.DailyBackupWindowHour != nil {
+		if site.Status.NextBackupTime == nil || site.Status.NextBackupTime.UTC().Hour() != int(*site.Spec.DailyBackupWindowHour) {
 			site.Status.NextBackupTime, err = r.getNextBackupTimeForSite(site)
-			if nil != err {
+			if err != nil {
 				return isChanged, err
 			}
 			isChanged = true
 		}
-	} else if nil != site.Status.NextBackupTime {
+	} else if site.Status.NextBackupTime != nil {
 		site.Status.NextBackupTime = nil
 		isChanged = true
 	}
@@ -448,7 +478,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 		&backupList,
 		client.InNamespace(site.Namespace),
 		client.MatchingFields{indexes.SiteName: site.Name},
-	); nil != err {
+	); err != nil {
 		return isChanged, err
 	}
 
@@ -456,8 +486,8 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 	backupControlClaimed := false
 
 	for _, backup := range backupList.Items {
-		if jobv1.Complete == backup.Status.State && nil != backup.Status.JobFinishedAt {
-			if nil == lastBackupTime || lastBackupTime.Before(backup.Status.JobFinishedAt) {
+		if backup.Status.State == jobv1.Complete && backup.Status.JobFinishedAt != nil {
+			if lastBackupTime == nil || lastBackupTime.Before(backup.Status.JobFinishedAt) {
 				lastBackupTime = backup.Status.JobFinishedAt
 				isChanged = true
 			}
@@ -465,18 +495,18 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 		if backup.Status.State.IsFinal() {
 			finishedBackups = append(finishedBackups, backup)
 		}
-		if nil == metav1.GetControllerOf(&backup) {
-			if err = ctrl.SetControllerReference(site, &backup, r.Scheme); nil != err {
-				return isChanged, nil
+		if metav1.GetControllerOf(&backup) == nil {
+			if err = ctrl.SetControllerReference(site, &backup, r.Scheme); err != nil {
+				return isChanged, err
 			}
-			if err = r.Update(ctx, &backup); nil != err {
-				return isChanged, nil
+			if err = r.Update(ctx, &backup); err != nil {
+				return isChanged, err
 			}
 			backupControlClaimed = true
 		}
 	}
 
-	if nil != lastBackupTime && (nil == site.Status.LastBackupTime || site.Status.LastBackupTime.Before(lastBackupTime)) {
+	if lastBackupTime != nil && (site.Status.LastBackupTime == nil || site.Status.LastBackupTime.Before(lastBackupTime)) {
 		site.Status.LastBackupTime = lastBackupTime
 		isChanged = true
 	}
@@ -500,7 +530,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 			if int32(i) >= int32(len(finishedBackups))-3 {
 				break
 			}
-			if err := r.Delete(ctx, &backupJob); nil != err {
+			if err := r.Delete(ctx, &backupJob); err != nil {
 				return isChanged, err
 			}
 			log.FromContext(ctx).V(1).Info("Cleaned up old backup", "backup", backupJob)
@@ -511,7 +541,7 @@ func (r *StagingSiteReconciler) ensureStatusIsUpToDate(site *sitev1.StagingSite,
 }
 
 func (r *StagingSiteReconciler) resetStatusErrors(site *sitev1.StagingSite) {
-	if sitev1.StateFailed == site.Status.State {
+	if site.Status.State == sitev1.StateFailed {
 		// If we are in a failed state reset to pending and clear the error message so they can be set and populated if
 		// the child resources still require that
 		site.Status.State = sitev1.StatePending
@@ -520,12 +550,12 @@ func (r *StagingSiteReconciler) resetStatusErrors(site *sitev1.StagingSite) {
 }
 
 func (r *StagingSiteReconciler) getNextBackupTimeForSite(site *sitev1.StagingSite) (*metav1.Time, error) {
-	if nil == site.Spec.DailyBackupWindowHour || *site.Spec.DailyBackupWindowHour < 0 {
+	if site.Spec.DailyBackupWindowHour == nil || *site.Spec.DailyBackupWindowHour < 0 {
 		return nil, nil
 	}
 
 	hash := fnv.New32a()
-	if _, err := hash.Write([]byte(site.Name)); nil != err {
+	if _, err := hash.Write([]byte(site.Name)); err != nil {
 		return nil, err
 	}
 
@@ -534,7 +564,7 @@ func (r *StagingSiteReconciler) getNextBackupTimeForSite(site *sitev1.StagingSit
 	minutes := offsetSeconds / 60
 	seconds := offsetSeconds % 60
 
-	now := r.Clock.Now()
+	now := r.Now()
 	nextRunAt, err := time.Parse(
 		time.RFC3339,
 		fmt.Sprintf(
@@ -547,7 +577,7 @@ func (r *StagingSiteReconciler) getNextBackupTimeForSite(site *sitev1.StagingSit
 			seconds,
 		),
 	)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -569,7 +599,7 @@ func (r *StagingSiteReconciler) ensureDatabasesAreCreated(site *sitev1.StagingSi
 	site.Status.DatabaseCreationComplete = true
 
 	for _, handler := range handlers {
-		if isComplete, err := handler.EnsureDatabasesAreCreated(site, ctx); nil != err {
+		if isComplete, err := handler.EnsureDatabasesAreCreated(site, ctx); err != nil {
 			return false, err
 		} else {
 			site.Status.DatabaseCreationComplete = site.Status.DatabaseCreationComplete && isComplete
@@ -579,7 +609,7 @@ func (r *StagingSiteReconciler) ensureDatabasesAreCreated(site *sitev1.StagingSi
 	site.Status.DatabaseInitialisationComplete = true
 
 	for _, handler := range handlers {
-		if isComplete, err := handler.EnsureDatabasesAreReady(site, ctx); nil != err {
+		if isComplete, err := handler.EnsureDatabasesAreReady(site, ctx); err != nil {
 			return false, err
 		} else {
 			site.Status.DatabaseCreationComplete = site.Status.DatabaseCreationComplete && isComplete
@@ -599,13 +629,13 @@ func (r *StagingSiteReconciler) ensureDatabasesAreInitialised(site *sitev1.Stagi
 	site.Status.DatabaseInitialisationComplete = true
 
 	isComplete, err := handler.EnsureJobsAreCreated(site, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	site.Status.DatabaseInitialisationComplete = site.Status.DatabaseInitialisationComplete && isComplete
 
 	isComplete, err = handler.EnsureJobsAreComplete(site, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	site.Status.DatabaseInitialisationComplete = site.Status.DatabaseInitialisationComplete && isComplete
@@ -623,13 +653,13 @@ func (r *StagingSiteReconciler) ensureDatabaseMigrationJobsAreCreated(
 	site.Status.DatabaseMigrationsComplete = true
 
 	isComplete, err := handler.EnsureJobsAreCreated(site, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	site.Status.DatabaseMigrationsComplete = site.Status.DatabaseMigrationsComplete && isComplete
 
 	isComplete, err = handler.EnsureJobsAreComplete(site, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	site.Status.DatabaseMigrationsComplete = site.Status.DatabaseMigrationsComplete && isComplete
@@ -641,7 +671,7 @@ func (r *StagingSiteReconciler) ensureConfigsAreUpToDate(site *sitev1.StagingSit
 	handler := sitehandler.ConfigHandler{Reader: r, Writer: r, Scheme: r.Scheme}
 	isChanged := false
 
-	if changed, err := handler.EnsureConfigsAreUpToDate(site, ctx); nil != err {
+	if changed, err := handler.EnsureConfigsAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isChanged = changed
@@ -656,7 +686,7 @@ func (r *StagingSiteReconciler) ensureWorkloadObjectsAreUpToDate(site *sitev1.St
 	handler := sitehandler.WorkloadHandler{Reader: r, Writer: r, Scheme: r.Scheme}
 	isChanged := false
 
-	if changed, err := handler.EnsureWorkloadObjectsAreUpToDate(site, ctx); nil != err {
+	if changed, err := handler.EnsureWorkloadObjectsAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isChanged = changed
@@ -671,7 +701,7 @@ func (r *StagingSiteReconciler) ensureNetworkingObjectsAreUpToDate(site *sitev1.
 	handler := sitehandler.NetworkingHandler{Reader: r, Writer: r, Scheme: r.Scheme}
 	isChanged := false
 
-	if changed, err := handler.EnsureNetworkingObjectsAreUpToDate(site, ctx); nil != err {
+	if changed, err := handler.EnsureNetworkingObjectsAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isChanged = changed
@@ -686,19 +716,24 @@ func (r *StagingSiteReconciler) SaveStatusUpdatesIfObjectChanged(
 	result ctrl.Result,
 	err error,
 ) (ctrl.Result, error) {
-	if nil != err {
+	if err != nil {
 		var controllerError errorhelpers.ControllerError
 		if errors.As(err, &controllerError) {
 			if controllerError.IsFinal() {
 				log.FromContext(ctx).Error(controllerError, "Received final controller error. Failing site")
+				appmetrics.Errors.WithLabelValues("stagingsite", "true").Inc()
 				site.Status.State = sitev1.StateFailed
 				site.Status.ErrorMessage = err.Error()
 				isChanged = true
 				result = ctrl.Result{}
 				err = nil
+			} else {
+				appmetrics.Errors.WithLabelValues("stagingsite", "false").Inc()
 			}
+		} else {
+			appmetrics.Errors.WithLabelValues("stagingsite", "false").Inc()
 		}
-		if sitev1.StateFailed == site.Status.State && !isChanged {
+		if site.Status.State == sitev1.StateFailed && !isChanged {
 			isChanged = true
 		}
 	}
@@ -709,39 +744,36 @@ func (r *StagingSiteReconciler) SaveStatusUpdatesIfObjectChanged(
 }
 
 func (r *StagingSiteReconciler) setSiteState(site *sitev1.StagingSite) {
-	if sitev1.StateFailed == site.Status.State {
+	if site.Status.State == sitev1.StateFailed {
 		return
 	}
 
-	status := site.Status
-
-	if status.DatabaseCreationComplete &&
-		status.DatabaseInitialisationComplete &&
-		status.DatabaseMigrationsComplete &&
-		status.ConfigsAreCreated &&
-		status.NetworkingObjectsAreCreated &&
-		status.WorkloadsAreCreated &&
-		nil == site.DeletionTimestamp {
+	if site.Status.DatabaseCreationComplete &&
+		site.Status.DatabaseInitialisationComplete &&
+		site.Status.DatabaseMigrationsComplete &&
+		site.Status.ConfigsAreCreated &&
+		site.Status.NetworkingObjectsAreCreated &&
+		site.Status.WorkloadsAreCreated &&
+		site.DeletionTimestamp == nil {
 		site.Status.State = sitev1.StateComplete
 	} else {
 		site.Status.State = sitev1.StatePending
 	}
 
-	if status.State != sitev1.StateComplete {
-		status.WorkloadHealth = sitev1.WorkloadHealthIncomplete
+	if site.Status.State != sitev1.StateComplete {
+		site.Status.WorkloadHealth = sitev1.WorkloadHealthIncomplete
 	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *StagingSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// set up a real clock, since we're not in a test
+	// Default to real clock when not injected by tests
 	if r.Clock == nil {
 		r.Clock = realClock{}
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(), &configv1.ServiceConfig{}, indexes.ShortName, func(rawObj client.Object) []string {
-			// grab the config object, extract the short name.
 			config := rawObj.(*configv1.ServiceConfig)
 			return []string{config.Spec.ShortName}
 		},
@@ -787,9 +819,8 @@ func (r *StagingSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if err := mgr.GetFieldIndexer().IndexField(
 		context.Background(), &jobv1.Backup{}, indexes.SiteName, func(rawObj client.Object) []string {
-			// grab the config object, extract the short name.
-			config := rawObj.(*jobv1.Backup)
-			return []string{config.Spec.SiteName}
+			backup := rawObj.(*jobv1.Backup)
+			return []string{backup.Spec.SiteName}
 		},
 	); err != nil {
 		return err

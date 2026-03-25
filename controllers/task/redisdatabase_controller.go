@@ -22,6 +22,7 @@ import (
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	controller "github.com/szeber/kube-stager/controllers"
 	"github.com/szeber/kube-stager/handlers/database"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +34,8 @@ import (
 // RedisDatabaseReconciler reconciles a RedisDatabase object
 type RedisDatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	DatabaseReconciler database.RedisReconciler
 }
 
 //+kubebuilder:rbac:groups=task.operator.kube-stager.io,resources=redisdatabases,verbs=get;list;watch;create;update;patch;delete
@@ -48,7 +50,8 @@ type RedisDatabaseReconciler struct {
 func (r *RedisDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
+		appmetrics.Errors.WithLabelValues("redis", "false").Inc()
 		sentry.CaptureException(err)
 	}
 
@@ -60,7 +63,7 @@ func (r *RedisDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 	var db taskv1.RedisDatabase
 
-	if err := r.Get(ctx, req.NamespacedName, &db); nil != err {
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "unable to fetch database")
 		}
@@ -73,17 +76,20 @@ func (r *RedisDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	var config configv1.RedisConfig
 
 	configKey := client.ObjectKey{Namespace: db.Namespace, Name: db.Spec.EnvironmentConfig.Environment}
-	if err := r.Get(ctx, configKey, &config); nil != err {
+	if err := r.Get(ctx, configKey, &config); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	changed, err := database.ReconcileRedis(&db, config, logger)
+	changed, err := r.DatabaseReconciler.Reconcile(&db, config, logger)
 
 	return controller.SaveStatusUpdatesIfObjectChanged(changed, r.Status(), ctx, &db, ctrl.Result{}, err)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *RedisDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.DatabaseReconciler == nil {
+		r.DatabaseReconciler = database.DefaultRedisReconciler{}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&taskv1.RedisDatabase{}).
 		Complete(r)

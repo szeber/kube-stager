@@ -28,17 +28,17 @@ func (r *BackupHandler) Create(
 	now time.Time,
 ) error {
 	backupName, err := r.makeBackupName(site.Name, backupType, now)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
 	job, err := r.createJob(site, backupName, backupType)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
 	err = r.Writer.Create(ctx, job)
-	if nil != err {
+	if err != nil {
 		return err
 	}
 
@@ -48,34 +48,35 @@ func (r *BackupHandler) Create(
 func (r *BackupHandler) EnsureFinalBackupIsComplete(site *sitev1.StagingSite, ctx context.Context) (bool, error) {
 	logger := log.FromContext(ctx)
 	backupName, err := r.makeBackupName(site.Name, jobv1.BackupTypeFinal, time.Now())
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
 	logger.V(0).Info("Trying to load existing backup job")
 	job := &jobv1.Backup{}
 	err = r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: backupName}, job)
-	if nil != client.IgnoreNotFound(err) {
+	if client.IgnoreNotFound(err) != nil {
 		return false, err
 	}
 
-	if nil != err {
+	if err != nil {
 		logger.V(0).Info("No existing backup job found, creating one")
-		if job, err = r.createJob(site, backupName, jobv1.BackupTypeFinal); nil != err {
+		if job, err = r.createJob(site, backupName, jobv1.BackupTypeFinal); err != nil {
 			return false, err
 		}
 
 		err = r.Writer.Create(ctx, job)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 		logger.V(1).Info("Backup job created")
 	} else {
 		logger.V(0).Info("Existing backup job found", "job", job)
-		if jobv1.Complete == job.Status.State {
+		switch job.Status.State {
+		case jobv1.Complete:
 			return true, nil
-		} else if jobv1.Failed == job.Status.State {
-			logger.Error(errors.New("The existing backup job is in a failed state"), "Backup failed", "job", job)
+		case jobv1.Failed:
+			logger.Error(errors.New("the existing backup job is in a failed state"), "Backup failed", "job", job)
 			return true, nil
 		}
 	}
@@ -117,8 +118,8 @@ func (r *BackupHandler) createJob(
 		},
 	}
 
-	if err := ctrl.SetControllerReference(site, job, r.Scheme); nil != err {
-		return job, nil
+	if err := ctrl.SetControllerReference(site, job, r.Scheme); err != nil {
+		return job, err
 	}
 
 	return job, nil

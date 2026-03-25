@@ -24,6 +24,7 @@ import (
 	controller "github.com/szeber/kube-stager/controllers"
 	"github.com/szeber/kube-stager/handlers/database"
 	"github.com/szeber/kube-stager/helpers"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +34,8 @@ import (
 // MongoDatabaseReconciler reconciles a MongoDatabase object
 type MongoDatabaseReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme             *runtime.Scheme
+	DatabaseReconciler database.MongoReconciler
 }
 
 //+kubebuilder:rbac:groups=task.operator.kube-stager.io,resources=mongodatabases,verbs=get;list;watch;create;update;patch;delete
@@ -48,7 +50,8 @@ type MongoDatabaseReconciler struct {
 func (r *MongoDatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
+		appmetrics.Errors.WithLabelValues("mongo", "false").Inc()
 		sentry.CaptureException(err)
 	}
 
@@ -60,7 +63,7 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 	var db taskv1.MongoDatabase
 
-	if err := r.Get(ctx, req.NamespacedName, &db); nil != err {
+	if err := r.Get(ctx, req.NamespacedName, &db); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			logger.Error(err, "unable to fetch database")
 		}
@@ -73,22 +76,22 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 	var config configv1.MongoConfig
 
 	configKey := client.ObjectKey{Namespace: db.Namespace, Name: db.Spec.EnvironmentConfig.Environment}
-	if err := r.Get(ctx, configKey, &config); nil != err {
+	if err := r.Get(ctx, configKey, &config); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	isDbChanged := false
 
-	if !db.ObjectMeta.DeletionTimestamp.IsZero() {
-		if err := database.DeleteMongoDatabase(&db, config, logger); nil != err {
+	if !db.DeletionTimestamp.IsZero() {
+		if err := r.DatabaseReconciler.Delete(&db, config, logger); err != nil {
 			return ctrl.Result{}, err
 		}
 
-		previousFinalizersLength := len(db.ObjectMeta.Finalizers)
-		db.ObjectMeta.Finalizers = helpers.RemoveStringFromSlice(db.ObjectMeta.Finalizers, helpers.MongoFinalizerName)
+		previousFinalizersLength := len(db.Finalizers)
+		db.Finalizers = helpers.RemoveStringFromSlice(db.Finalizers, helpers.MongoFinalizerName)
 
-		if len(db.ObjectMeta.Finalizers) != previousFinalizersLength {
-			if err := r.Update(ctx, &db); nil != err {
+		if len(db.Finalizers) != previousFinalizersLength {
+			if err := r.Update(ctx, &db); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -96,15 +99,15 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	if !helpers.SliceContainsString(db.ObjectMeta.Finalizers, helpers.MongoFinalizerName) {
-		db.ObjectMeta.Finalizers = append(db.ObjectMeta.Finalizers, helpers.MongoFinalizerName)
-		if err := r.Update(ctx, &db); nil != err {
+	if !helpers.SliceContainsString(db.Finalizers, helpers.MongoFinalizerName) {
+		db.Finalizers = append(db.Finalizers, helpers.MongoFinalizerName)
+		if err := r.Update(ctx, &db); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	changed, err := database.ReconcileMongoDatabase(&db, config, logger)
+	changed, err := r.DatabaseReconciler.Reconcile(&db, config, logger)
 
 	isDbChanged = isDbChanged || changed
 
@@ -113,6 +116,9 @@ func (r *MongoDatabaseReconciler) doReconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MongoDatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.DatabaseReconciler == nil {
+		r.DatabaseReconciler = database.DefaultMongoReconciler{}
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&taskv1.MongoDatabase{}).
 		Complete(r)

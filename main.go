@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	"os"
+	goruntime "runtime"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	webhook2 "github.com/szeber/kube-stager/handlers/webhook"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 
 	configv1 "github.com/szeber/kube-stager/apis/config/v1"
 	controllerconfigv1 "github.com/szeber/kube-stager/apis/controller-config/v1"
@@ -56,6 +59,7 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+	version  = "dev"
 )
 
 func init() {
@@ -192,7 +196,7 @@ func main() {
 
 	setupLog.Info("Using config", "config", ctrlConfig)
 
-	if "" != ctrlConfig.SentryDsn {
+	if ctrlConfig.SentryDsn != "" {
 		err = sentry.Init(
 			sentry.ClientOptions{
 				Dsn: ctrlConfig.SentryDsn,
@@ -212,6 +216,9 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	appmetrics.BuildInfo.WithLabelValues(version, goruntime.Version()).Set(1)
+	metrics.Registry.MustRegister(appmetrics.NewResourceCollector(mgr.GetClient()))
 
 	if err = (&taskcontrollers.MysqlDatabaseReconciler{
 		Client: mgr.GetClient(),

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	jobv1 "github.com/szeber/kube-stager/apis/job/v1"
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/http"
@@ -26,7 +27,7 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 	job := &jobv1.Backup{}
 	var err error
 
-	if err = r.Decoder.Decode(req, job); nil != err {
+	if err = r.Decoder.Decode(req, job); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -35,12 +36,13 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 		ctx,
 		client.ObjectKey{Namespace: job.Namespace, Name: job.Spec.SiteName},
 		site,
-	); nil != client.IgnoreNotFound(err) {
+	); client.IgnoreNotFound(err) != nil {
 		logger.Error(err, "Failed to load the site for the backup job")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	if nil != err {
+	if err != nil {
+		appmetrics.WebhookDenied.WithLabelValues("backup", "site_not_found").Inc()
 		return admission.Denied(
 			fmt.Sprintf(
 				"Staging site with name %s not found in namespace %s",
@@ -50,9 +52,9 @@ func (r *BackupCreateOrUpdateHandler) Handle(ctx context.Context, req admission.
 		)
 	}
 
-	if nil == metav1.GetControllerOf(job) {
+	if metav1.GetControllerOf(job) == nil {
 		err = ctrl.SetControllerReference(site, job, r.Scheme)
-		if nil != err {
+		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 

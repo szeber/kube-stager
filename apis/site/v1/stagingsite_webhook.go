@@ -50,13 +50,13 @@ type StagingSiteDefaulter struct{}
 func (d *StagingSiteDefaulter) Default(ctx context.Context, r *StagingSite) error {
 	stagingsitelog.Info("default", "name", r.Name)
 
-	if 0 == len(r.ObjectMeta.Annotations) {
-		r.ObjectMeta.Annotations = make(map[string]string)
+	if len(r.Annotations) == 0 {
+		r.Annotations = make(map[string]string)
 	}
 
-	r.ObjectMeta.Annotations[annotations.StagingSiteLastSpecChangeAt] = time.Now().Format(time.RFC3339)
+	r.Annotations[annotations.StagingSiteLastSpecChangeAt] = time.Now().Format(time.RFC3339)
 
-	if "" == r.Spec.DomainPrefix {
+	if r.Spec.DomainPrefix == "" {
 		if len(r.Name) > 63 {
 			r.Spec.DomainPrefix = r.Name[0:63]
 		} else {
@@ -64,7 +64,7 @@ func (d *StagingSiteDefaulter) Default(ctx context.Context, r *StagingSite) erro
 		}
 	}
 
-	if "" == r.Spec.DbName {
+	if r.Spec.DbName == "" {
 		r.Spec.DbName = helpers.SanitiseAndShortenDbValue(r.Name, 63)
 	}
 

@@ -22,17 +22,17 @@ func (r *DbInitJob) PopulateFomSite(
 	}
 
 	r.ObjectMeta = metav1.ObjectMeta{
-		Name:      helpers.ShortenHumanReadableValue(site.ObjectMeta.Name, 50) + "-" + config.Spec.ShortName,
-		Namespace: site.ObjectMeta.Namespace,
+		Name:      helpers.ShortenHumanReadableValue(site.Name, 50) + "-" + config.Spec.ShortName,
+		Namespace: site.Namespace,
 		Labels: map[string]string{
-			labels.Site:    site.ObjectMeta.Name,
-			labels.Service: config.ObjectMeta.Name,
+			labels.Site:    site.Name,
+			labels.Service: config.Name,
 		},
 		Annotations: map[string]string{},
 	}
 	r.Spec = DbInitJobSpec{
 		SiteName:         site.Name,
-		ServiceName:      config.ObjectMeta.Name,
+		ServiceName:      config.Name,
 		MysqlEnvironment: mysqlEnvironment,
 		MongoEnvironment: mongoEnvironment,
 		DbInitSource:     siteService.DbInitSourceEnvironmentName,
@@ -41,10 +41,5 @@ func (r *DbInitJob) PopulateFomSite(
 		Password:         site.Spec.Password,
 		DeadlineSeconds:  600,
 	}
-	r.Name = r.ObjectMeta.Name
-	r.Namespace = r.ObjectMeta.Namespace
-	r.Labels = r.ObjectMeta.Labels
-	r.Annotations = r.ObjectMeta.Annotations
-
 	return nil
 }

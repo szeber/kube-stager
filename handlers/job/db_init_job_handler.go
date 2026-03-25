@@ -26,7 +26,7 @@ func (r DbInitJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ctx con
 
 	var list jobv1.DbInitJobList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -43,7 +43,7 @@ func (r DbInitJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ctx con
 		}
 		var serviceConfig configv1.ServiceConfig
 		err = r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, &serviceConfig)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 
@@ -58,7 +58,7 @@ func (r DbInitJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ctx con
 			service.MysqlEnvironment,
 			service.MongoEnvironment,
 		)
-		if nil != err {
+		if err != nil {
 			return false, err
 		}
 	}
@@ -77,13 +77,13 @@ func (r DbInitJobHandler) EnsureJobsAreCreated(site *sitev1.StagingSite, ctx con
 
 	for serviceName, database := range jobsToDelete {
 		logger.V(1).Info("Deleting init job for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &database); nil != err {
+		if err = r.Writer.Delete(ctx, &database); err != nil {
 			return isComplete, err
 		}
 	}
 	for serviceName, database := range jobsToCreate {
 		logger.V(1).Info("Creating init job for service " + serviceName)
-		if err = r.Writer.Create(ctx, &database); nil != err {
+		if err = r.Writer.Create(ctx, &database); err != nil {
 			return isComplete, err
 		}
 	}
@@ -100,7 +100,7 @@ func (r DbInitJobHandler) EnsureJobsAreComplete(site *sitev1.StagingSite, ctx co
 
 	var list jobv1.DbInitJobList
 	err := r.Reader.List(ctx, &list, client.InNamespace(site.Namespace), client.MatchingLabels{labels.Site: site.Name})
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	logger.V(1).Info("Retrieved list", "count", len(list.Items))
@@ -108,7 +108,7 @@ func (r DbInitJobHandler) EnsureJobsAreComplete(site *sitev1.StagingSite, ctx co
 	isEverythingReady := true
 
 	for _, database := range list.Items {
-		if jobv1.Failed == database.Status.State {
+		if database.Status.State == jobv1.Failed {
 			return false, errors.DatabaseInitError{
 				SiteName:    database.Spec.SiteName,
 				ServiceName: database.Spec.ServiceName,
@@ -133,11 +133,11 @@ func (r DbInitJobHandler) getPopulatedJob(
 	mongoEnvironment string,
 ) (jobv1.DbInitJob, error) {
 	job := jobv1.DbInitJob{}
-	if err := job.PopulateFomSite(site, serviceConfig, mysqlEnvironment, mongoEnvironment); nil != err {
+	if err := job.PopulateFomSite(site, serviceConfig, mysqlEnvironment, mongoEnvironment); err != nil {
 		return job, err
 	}
 
-	if err := ctrl.SetControllerReference(site, &job, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(site, &job, r.Scheme); err != nil {
 		return job, err
 	}
 

@@ -10,7 +10,7 @@ type UnresolvedTemplatesError struct {
 }
 
 func (r UnresolvedTemplatesError) Error() string {
-	if "" == r.Key {
+	if r.Key == "" {
 		return fmt.Sprintf(
 			"Not all templates have been resolved in the %s. Unresolved template variables: %v. Available template variables: %v",
 			r.EntityType,

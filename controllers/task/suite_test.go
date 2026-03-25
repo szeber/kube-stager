@@ -17,20 +17,20 @@ limitations under the License.
 package task
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/client-go/kubernetes/scheme"
+	"github.com/szeber/kube-stager/internal/testutil"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	taskv1 "github.com/szeber/kube-stager/apis/task/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -40,8 +40,14 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var ctx context.Context
+var cancel context.CancelFunc
+var mockMysqlReconciler *testutil.MockMysqlReconciler
+var mockMongoReconciler *testutil.MockMongoReconciler
+var mockRedisReconciler *testutil.MockRedisReconciler
 
 func TestAPIs(t *testing.T) {
+	testutil.SafeTestMain(t)
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
@@ -51,32 +57,73 @@ var _ = BeforeSuite(
 	func() {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
+		ctx, cancel = context.WithCancel(context.TODO())
+
 		By("bootstrapping test environment")
+		useExistingCluster := false
 		testEnv = &envtest.Environment{
 			CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 			ErrorIfCRDPathMissing: true,
+			UseExistingCluster:    &useExistingCluster,
 		}
 
 		var err error
-		// cfg is defined in this file globally.
 		cfg, err = testEnv.Start()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(cfg).NotTo(BeNil())
 
-		err = taskv1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
+		testScheme := testutil.NewTestScheme()
 
 		//+kubebuilder:scaffold:scheme
 
-		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(k8sClient).NotTo(BeNil())
 
+		mockMysqlReconciler = &testutil.MockMysqlReconciler{}
+		mockMongoReconciler = &testutil.MockMongoReconciler{}
+		mockRedisReconciler = &testutil.MockRedisReconciler{}
+
+		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+			Scheme: testScheme,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		err = (&MysqlDatabaseReconciler{
+			Client:             mgr.GetClient(),
+			Scheme:             mgr.GetScheme(),
+			DatabaseReconciler: mockMysqlReconciler,
+		}).SetupWithManager(mgr)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = (&MongoDatabaseReconciler{
+			Client:             mgr.GetClient(),
+			Scheme:             mgr.GetScheme(),
+			DatabaseReconciler: mockMongoReconciler,
+		}).SetupWithManager(mgr)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = (&RedisDatabaseReconciler{
+			Client:             mgr.GetClient(),
+			Scheme:             mgr.GetScheme(),
+			DatabaseReconciler: mockRedisReconciler,
+		}).SetupWithManager(mgr)
+		Expect(err).NotTo(HaveOccurred())
+
+		go func() {
+			defer GinkgoRecover()
+			if err := mgr.Start(ctx); err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+		}()
+
+		Expect(mgr.GetCache().WaitForCacheSync(ctx)).To(BeTrue())
 	},
 )
 
 var _ = AfterSuite(
 	func() {
+		cancel()
 		By("tearing down the test environment")
 		err := testEnv.Stop()
 		Expect(err).NotTo(HaveOccurred())

@@ -29,6 +29,7 @@ import (
 	"github.com/szeber/kube-stager/helpers"
 	labels "github.com/szeber/kube-stager/helpers/labels"
 	"github.com/szeber/kube-stager/helpers/pod"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,8 @@ const (
 func (r *DbInitJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	result, err := r.doReconcile(ctx, req)
 
-	if nil != err {
+	if err != nil {
+		appmetrics.Errors.WithLabelValues("dbinit", "false").Inc()
 		sentry.CaptureException(err)
 	}
 
@@ -86,7 +88,7 @@ func (r *DbInitJobReconciler) doReconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if "" == job.Status.State || nil == job.Status.DeadlineTimestamp {
+	if job.Status.State == "" || job.Status.DeadlineTimestamp == nil {
 		logger.V(0).Info("Initialising job state")
 		job.Status.State = jobv1.Pending
 		job.Status.DeadlineTimestamp = &metav1.Time{Time: time.Now().Add(time.Duration(job.Spec.DeadlineSeconds) * time.Second)}
@@ -130,7 +132,7 @@ func (r *DbInitJobReconciler) processRunningJob(job *jobv1.DbInitJob, ctx contex
 	logger.V(0).Info("Loading init job")
 
 	jobList, err := r.getOwnedInitJobs(job, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -156,12 +158,18 @@ func (r *DbInitJobReconciler) processRunningJob(job *jobv1.DbInitJob, ctx contex
 		if v.Type == batchv1.JobComplete && v.Status == corev1.ConditionTrue {
 			logger.V(1).Info("Job finished successfully")
 			job.Status.State = jobv1.Complete
+			appmetrics.JobCompletions.WithLabelValues("dbinit", "success").Inc()
+			if job.Status.DeadlineTimestamp != nil {
+				duration := time.Since(job.Status.DeadlineTimestamp.Add(-time.Duration(job.Spec.DeadlineSeconds) * time.Second))
+				appmetrics.JobDuration.WithLabelValues("dbinit").Observe(duration.Seconds())
+			}
 			return true, nil
 		}
 
 		if v.Type == batchv1.JobFailed && v.Status == corev1.ConditionTrue {
 			logger.V(0).Info("Job failed", "status", v.Message, "reason", v.Reason)
 			job.Status.State = jobv1.Failed
+			appmetrics.JobCompletions.WithLabelValues("dbinit", "failure").Inc()
 			return true, nil
 		}
 	}
@@ -169,6 +177,7 @@ func (r *DbInitJobReconciler) processRunningJob(job *jobv1.DbInitJob, ctx contex
 	if time.Now().After(job.Status.DeadlineTimestamp.Time) {
 		logger.V(0).Info("The job deadline has expired. Failing job.")
 		job.Status.State = jobv1.Failed
+		appmetrics.JobCompletions.WithLabelValues("dbinit", "failure").Inc()
 		return true, nil
 	}
 
@@ -180,7 +189,7 @@ func (r *DbInitJobReconciler) createJobIfNeeded(job *jobv1.DbInitJob, ctx contex
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("Job is in Pending state")
 	jobList, err := r.getOwnedInitJobs(job, ctx)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -191,26 +200,26 @@ func (r *DbInitJobReconciler) createJobIfNeeded(job *jobv1.DbInitJob, ctx contex
 	}
 
 	mysqlConfig, err := r.getMysqlConfig(ctx, job.Namespace, job.Spec.MysqlEnvironment)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 	mongoConfig, err := r.getMongoConfig(ctx, job.Namespace, job.Spec.MongoEnvironment)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
-	if nil == mysqlConfig && nil == mongoConfig {
+	if mysqlConfig == nil && mongoConfig == nil {
 		logger.V(0).Info("Neither mysql, nor mongo is configured. Failing job")
 		job.Status.State = jobv1.Failed
 		return true, nil
 	}
 
 	serviceConfig, err := r.getServiceConfig(ctx, job.Namespace, job.Spec.ServiceName)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
-	if nil == serviceConfig.Spec.DbInitPodSpec {
+	if serviceConfig.Spec.DbInitPodSpec == nil {
 		logger.V(0).Info("No db init pod spec is specified. Failing job")
 		job.Status.State = jobv1.Failed
 		return true, nil
@@ -218,11 +227,11 @@ func (r *DbInitJobReconciler) createJobIfNeeded(job *jobv1.DbInitJob, ctx contex
 
 	logger.V(0).Info("Creating job")
 	batchJob, err := r.createJob(ctx, job, serviceConfig)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
-	if err := r.Create(ctx, batchJob); nil != err {
+	if err := r.Create(ctx, batchJob); err != nil {
 		return false, err
 	}
 
@@ -236,12 +245,12 @@ func (r *DbInitJobReconciler) getMongoConfig(ctx context.Context, namespace stri
 	*configv1.MongoConfig,
 	error,
 ) {
-	if "" == name {
+	if name == "" {
 		return nil, nil
 	}
 
 	var config configv1.MongoConfig
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); nil != err {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); err != nil {
 		return nil, err
 	}
 
@@ -252,12 +261,12 @@ func (r *DbInitJobReconciler) getMysqlConfig(ctx context.Context, namespace stri
 	*configv1.MysqlConfig,
 	error,
 ) {
-	if "" == name {
+	if name == "" {
 		return nil, nil
 	}
 
 	var config configv1.MysqlConfig
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); nil != err {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); err != nil {
 		return nil, err
 	}
 
@@ -270,7 +279,7 @@ func (r *DbInitJobReconciler) getServiceConfig(
 	name string,
 ) (*configv1.ServiceConfig, error) {
 	var config configv1.ServiceConfig
-	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); nil != err {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &config); err != nil {
 		return nil, err
 	}
 
@@ -278,13 +287,13 @@ func (r *DbInitJobReconciler) getServiceConfig(
 }
 
 func (r *DbInitJobReconciler) createJob(ctx context.Context, job *jobv1.DbInitJob, serviceConfig *configv1.ServiceConfig) (*batchv1.Job, error) {
-	if nil == serviceConfig.Spec.DbInitPodSpec {
+	if serviceConfig.Spec.DbInitPodSpec == nil {
 		return nil, errors.New("no db init pod spec specified in the service config")
 	}
 
 	var site sitev1.StagingSite
 	err := r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: job.Spec.SiteName}, &site)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -298,12 +307,12 @@ func (r *DbInitJobReconciler) createJob(ctx context.Context, job *jobv1.DbInitJo
 		labels.Service: job.Spec.ServiceName,
 	}
 	templateHandler := template.NewSite(site, *serviceConfig)
-	if err := template.LoadConfigs(&templateHandler, ctx, r.Client); nil != err {
+	if err := template.LoadConfigs(&templateHandler, ctx, r.Client); err != nil {
 		return nil, err
 	}
 
 	podSpec, err := helpers.ReplaceTemplateVariablesInPodSpec(*serviceConfig.Spec.DbInitPodSpec, &templateHandler)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -330,7 +339,7 @@ func (r *DbInitJobReconciler) createJob(ctx context.Context, job *jobv1.DbInitJo
 		},
 	}
 
-	if err := ctrl.SetControllerReference(job, batchJob, r.Scheme); nil != err {
+	if err := ctrl.SetControllerReference(job, batchJob, r.Scheme); err != nil {
 		return nil, err
 	}
 
@@ -340,7 +349,7 @@ func (r *DbInitJobReconciler) createJob(ctx context.Context, job *jobv1.DbInitJo
 func (r *DbInitJobReconciler) getOwnedInitJobs(job *jobv1.DbInitJob, ctx context.Context) (*batchv1.JobList, error) {
 	var jobList batchv1.JobList
 	labelMatcher := client.MatchingLabels{labels.JobName: job.Name, labels.Type: "dbinit"}
-	if err := r.List(ctx, &jobList, client.InNamespace(job.Namespace), labelMatcher); nil != err {
+	if err := r.List(ctx, &jobList, client.InNamespace(job.Namespace), labelMatcher); err != nil {
 		return nil, err
 	}
 

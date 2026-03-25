@@ -7,6 +7,7 @@ import (
 	sitev1 "github.com/szeber/kube-stager/apis/site/v1"
 	"github.com/szeber/kube-stager/helpers/indexes"
 	"github.com/szeber/kube-stager/helpers/labels"
+	appmetrics "github.com/szeber/kube-stager/internal/metrics"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -28,7 +29,7 @@ func (r *MysqlConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 		client.InNamespace(req.Namespace),
 		client.MatchingLabels{labels.MysqlEnvironmentsPrefix + req.Name: "true"},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
@@ -43,6 +44,7 @@ func (r *MysqlConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 				siteNames,
 			),
 		)
+		appmetrics.WebhookDenied.WithLabelValues("mysqlconfig_delete", "resource_in_use").Inc()
 		return admission.Denied(fmt.Sprintf("There are sites using this environment: %v", siteNames))
 	}
 
@@ -53,7 +55,7 @@ func (r *MysqlConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 		client.InNamespace(req.Namespace),
 		client.MatchingFields{indexes.DefaultMysqlEnvironment: req.Name},
 	)
-	if nil != err {
+	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
@@ -68,6 +70,7 @@ func (r *MysqlConfigDeleteHandler) Handle(ctx context.Context, req admission.Req
 				serviceNames,
 			),
 		)
+		appmetrics.WebhookDenied.WithLabelValues("mysqlconfig_delete", "resource_in_use").Inc()
 		return admission.Denied(fmt.Sprintf("There are services using this environment as a default: %v", serviceNames))
 	}
 

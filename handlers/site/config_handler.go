@@ -27,7 +27,7 @@ func (r ConfigHandler) EnsureConfigsAreUpToDate(site *sitev1.StagingSite, ctx co
 	previousComplete := site.Status.ConfigsAreCreated
 	isComplete := true
 
-	if complete, err := r.ensureConfigmapsAreUpToDate(site, ctx); nil != err {
+	if complete, err := r.ensureConfigmapsAreUpToDate(site, ctx); err != nil {
 		return false, err
 	} else {
 		isComplete = isComplete && complete
@@ -52,7 +52,7 @@ func (r ConfigHandler) ensureConfigmapsAreUpToDate(site *sitev1.StagingSite, ctx
 			labels.Site: site.Name,
 		},
 	)
-	if nil != err {
+	if err != nil {
 		return false, err
 	}
 
@@ -62,13 +62,13 @@ func (r ConfigHandler) ensureConfigmapsAreUpToDate(site *sitev1.StagingSite, ctx
 
 	for name := range site.Spec.Services {
 		config := &configv1.ServiceConfig{}
-		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); nil != err {
+		if err := r.Reader.Get(ctx, client.ObjectKey{Namespace: site.Namespace, Name: name}, config); err != nil {
 			return false, err
 		}
 
 		for key, values := range config.Spec.ConfigMaps {
 			dotenv, err := r.createConfigMap(ctx, site, config, key, values)
-			if nil != err {
+			if err != nil {
 				return false, err
 			}
 			dotenvsToCreate[r.makeConfigmapKey(config.Name, key)] = dotenv
@@ -77,8 +77,8 @@ func (r ConfigHandler) ensureConfigmapsAreUpToDate(site *sitev1.StagingSite, ctx
 
 	for _, configMap := range list.Items {
 		configmapKey := r.makeConfigmapKey(
-			configMap.ObjectMeta.Labels[labels.Service],
-			configMap.ObjectMeta.Labels[labels.Type],
+			configMap.Labels[labels.Service],
+			configMap.Labels[labels.Type],
 		)
 
 		if dotenvToCreate, ok := dotenvsToCreate[configmapKey]; ok {
@@ -93,23 +93,23 @@ func (r ConfigHandler) ensureConfigmapsAreUpToDate(site *sitev1.StagingSite, ctx
 	}
 
 	for serviceName, configMap := range dotenvsToDelete {
-		configmapType := configMap.ObjectMeta.Labels[labels.Type]
+		configmapType := configMap.Labels[labels.Type]
 		logger.V(1).Info("Deleting " + configmapType + " configmap for service " + serviceName)
-		if err = r.Writer.Delete(ctx, &configMap); nil != err {
+		if err = r.Writer.Delete(ctx, &configMap); err != nil {
 			return false, err
 		}
 	}
 	for serviceName, configMap := range dotenvsToUpdate {
-		configmapType := configMap.ObjectMeta.Labels[labels.Type]
+		configmapType := configMap.Labels[labels.Type]
 		logger.V(1).Info("Updating " + configmapType + " configmap for service " + serviceName)
-		if err = r.Writer.Update(ctx, &configMap); nil != err {
+		if err = r.Writer.Update(ctx, &configMap); err != nil {
 			return false, err
 		}
 	}
 	for serviceName, configMap := range dotenvsToCreate {
-		configmapType := configMap.ObjectMeta.Labels[labels.Type]
+		configmapType := configMap.Labels[labels.Type]
 		logger.V(1).Info("Creating " + configmapType + " configmap for service " + serviceName)
-		if err = r.Writer.Create(ctx, &configMap); nil != err {
+		if err = r.Writer.Create(ctx, &configMap); err != nil {
 			return false, err
 		}
 	}
@@ -132,11 +132,11 @@ func (r ConfigHandler) createConfigMap(
 ) (corev1.ConfigMap, error) {
 	templateHandler := template.NewSite(*site, *config)
 	err := template.LoadConfigs(&templateHandler, ctx, r.Reader)
-	if nil != err {
+	if err != nil {
 		return corev1.ConfigMap{}, err
 	}
 	replacedData, err := helpers.ReplaceTemplateVariablesInStringMap(data, "configmap data", &templateHandler)
-	if nil != err {
+	if err != nil {
 		return corev1.ConfigMap{}, err
 	}
 
