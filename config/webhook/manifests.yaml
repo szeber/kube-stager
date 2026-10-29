@@ -11,27 +11,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-site-operator-kube-stager-io-v1-stagingsite
-  failurePolicy: Fail
-  name: mstagingsite.kb.io
-  rules:
-  - apiGroups:
-    - site.operator.kube-stager.io
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - stagingsites
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /mutate-job-operator-kube-stager-io-v1-backup-advanced
   failurePolicy: Fail
   name: backup-handler.operator.kube-stager.io
@@ -45,6 +24,27 @@ webhooks:
     - UPDATE
     resources:
     - backups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-site-operator-kube-stager-io-v1-stagingsite
+  failurePolicy: Fail
+  name: mstagingsite.kb.io
+  rules:
+  - apiGroups:
+    - site.operator.kube-stager.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - stagingsites
   sideEffects: None
 - admissionReviewVersions:
   - v1
